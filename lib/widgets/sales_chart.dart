@@ -5,7 +5,7 @@ import '../utils/constants.dart';
 
 class SalesChart extends StatefulWidget {
   final List<Map<String, dynamic>> salesData;
-  final String chartType; // 'daily', 'weekly', 'monthly'
+  final String chartType;
 
   const SalesChart({
     super.key,
@@ -20,113 +20,132 @@ class SalesChart extends StatefulWidget {
 class _SalesChartState extends State<SalesChart> {
   @override
   Widget build(BuildContext context) {
+    // Safe check for null or empty data
     if (widget.salesData.isEmpty) {
       return _buildEmptyChart();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _getChartTitle(),
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.veryLightGreen,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _getPeriodLabel(),
+    // Validate that all data has required fields
+    bool hasValidData = true;
+    for (var data in widget.salesData) {
+      if (!data.containsKey('label') || !data.containsKey('value')) {
+        hasValidData = false;
+        break;
+      }
+    }
+
+    if (!hasValidData) {
+      return _buildEmptyChart();
+    }
+
+    try {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _getChartTitle(),
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: AppColors.primaryGreen,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 220,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 16, left: 8, top: 16, bottom: 16),
-            child: BarChart(
-              BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: _getMaxY(),
-                barTouchData: BarTouchData(
-                  enabled: true,
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      return BarTooltipItem(
-                        'UGX ${rod.toY.round()}',
-                        GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      );
-                    },
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.veryLightGreen,
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ),
-                titlesData: FlTitlesData(
-                  show: true,
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        return _getBottomTitle(value);
-                      },
-                      reservedSize: 30,
+                  child: Text(
+                    _getPeriodLabel(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: AppColors.primaryGreen,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        if (value == 0) return const Text('');
-                        return Text(
-                          'UGX ${value.toInt()}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: Colors.grey.shade600,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 220,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16, left: 8, top: 16, bottom: 16),
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: _getMaxY(),
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        return BarTooltipItem(
+                          'UGX ${rod.toY.round()}',
+                          GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
                           ),
                         );
                       },
-                      reservedSize: 40,
-                      interval: _getInterval(),
                     ),
                   ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          return _getBottomTitle(value);
+                        },
+                        reservedSize: 30,
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          if (value == 0) return const Text('');
+                          return Text(
+                            'UGX ${value.toInt()}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              color: Colors.grey.shade600,
+                            ),
+                          );
+                        },
+                        reservedSize: 40,
+                        interval: _getInterval(),
+                      ),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
+                  borderData: FlBorderData(
+                    show: false,
                   ),
+                  barGroups: _getBarGroups(),
+                  gridData: const FlGridData(show: false),
                 ),
-                borderData: FlBorderData(
-                  show: false,
-                ),
-                barGroups: _getBarGroups(),
-                gridData: const FlGridData(show: false),
               ),
             ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    } catch (e) {
+      print('Error rendering chart: $e');
+      return _buildEmptyChart();
+    }
   }
 
   Widget _buildEmptyChart() {
@@ -193,7 +212,7 @@ class _SalesChartState extends State<SalesChart> {
       final value = data['value'] ?? 0;
       if (value > max) max = value;
     }
-    return max * 1.2; // Add 20% padding
+    return max == 0 ? 100 : max * 1.2;
   }
 
   double _getInterval() {
@@ -207,6 +226,8 @@ class _SalesChartState extends State<SalesChart> {
   }
 
   List<BarChartGroupData> _getBarGroups() {
+    if (widget.salesData.isEmpty) return [];
+    
     return List.generate(widget.salesData.length, (index) {
       final data = widget.salesData[index];
       final value = data['value'] ?? 0;
@@ -231,7 +252,6 @@ class _SalesChartState extends State<SalesChart> {
   Color _getBarColor(int index) {
     if (widget.salesData.isEmpty) return AppColors.primaryGreen;
     
-    // Find highest value
     double maxValue = 0;
     for (var data in widget.salesData) {
       final value = data['value'] ?? 0;
@@ -240,8 +260,8 @@ class _SalesChartState extends State<SalesChart> {
     
     final currentValue = widget.salesData[index]['value'] ?? 0;
     
-    if (currentValue >= maxValue) {
-      return AppColors.primaryGreen; // Highlight highest
+    if (currentValue >= maxValue && maxValue > 0) {
+      return AppColors.primaryGreen;
     } else if (index % 2 == 0) {
       return Colors.blue.shade300;
     } else {

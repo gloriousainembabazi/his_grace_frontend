@@ -155,7 +155,7 @@ class _StaffReportScreenState extends State<StaffReportScreen> {
 
                   const SizedBox(height: 16),
 
-                  if (report != null && report['staff_summary'] != null) ...[
+                  if (report['staff_summary'] != null) ...[
                     // Staff Performance List
                     ListView.builder(
                       shrinkWrap: true,

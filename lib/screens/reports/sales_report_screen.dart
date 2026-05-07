@@ -215,161 +215,161 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
 
                   const SizedBox(height: 16),
 
-                  if (report != null) ...[
-                    // Summary Cards
-                    GridView.count(
+                  ...[
+                  // Summary Cards
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.2,
+                    children: [
+                      _buildSummaryCard(
+                        'Total Revenue',
+                        'UGX ${(report['summary']?['total_revenue'] ?? 0).toStringAsFixed(0)}',
+                        Icons.attach_money,
+                        Colors.green,
+                      ),
+                      _buildSummaryCard(
+                        'Transactions',
+                        '${report['summary']?['total_transactions'] ?? 0}',
+                        Icons.receipt,
+                        Colors.blue,
+                      ),
+                      _buildSummaryCard(
+                        'Average',
+                        'UGX ${(report['summary']?['average_transaction'] ?? 0).toStringAsFixed(0)}',
+                        Icons.trending_up,
+                        Colors.orange,
+                      ),
+                      _buildSummaryCard(
+                        'Max Transaction',
+                        'UGX ${(report['summary']?['max_transaction'] ?? 0).toStringAsFixed(0)}',
+                        Icons.star,
+                        Colors.purple,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Top Selling Medicines
+                  if (report['top_medicines'] != null && report['top_medicines'].isNotEmpty) ...[
+                    Text(
+                      'Top Selling Medicines',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 1.2,
-                      children: [
-                        _buildSummaryCard(
-                          'Total Revenue',
-                          'UGX ${(report['summary']?['total_revenue'] ?? 0).toStringAsFixed(0)}',
-                          Icons.attach_money,
-                          Colors.green,
-                        ),
-                        _buildSummaryCard(
-                          'Transactions',
-                          '${report['summary']?['total_transactions'] ?? 0}',
-                          Icons.receipt,
-                          Colors.blue,
-                        ),
-                        _buildSummaryCard(
-                          'Average',
-                          'UGX ${(report['summary']?['average_transaction'] ?? 0).toStringAsFixed(0)}',
-                          Icons.trending_up,
-                          Colors.orange,
-                        ),
-                        _buildSummaryCard(
-                          'Max Transaction',
-                          'UGX ${(report['summary']?['max_transaction'] ?? 0).toStringAsFixed(0)}',
-                          Icons.star,
-                          Colors.purple,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Top Selling Medicines
-                    if (report['top_medicines'] != null && report['top_medicines'].isNotEmpty) ...[
-                      Text(
-                        'Top Selling Medicines',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: report['top_medicines'].length,
-                        itemBuilder: (context, index) {
-                          final medicine = report['top_medicines'][index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
-                                child: Text(
-                                  '${index + 1}',
+                      itemCount: report['top_medicines'].length,
+                      itemBuilder: (context, index) {
+                        final medicine = report['top_medicines'][index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
+                              child: Text(
+                                '${index + 1}',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppConstants.primaryColor,
+                                ),
+                              ),
+                            ),
+                            title: Text(medicine['name'] ?? ''),
+                            subtitle: Text('${medicine['transaction_count'] ?? 0} sales'),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'UGX ${(medicine['total_revenue'] ?? 0).toStringAsFixed(0)}',
                                   style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                     color: AppConstants.primaryColor,
                                   ),
                                 ),
-                              ),
-                              title: Text(medicine['name'] ?? ''),
-                              subtitle: Text('${medicine['transaction_count'] ?? 0} sales'),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'UGX ${(medicine['total_revenue'] ?? 0).toStringAsFixed(0)}',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      color: AppConstants.primaryColor,
-                                    ),
+                                Text(
+                                  '${medicine['total_quantity'] ?? 0} units',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
                                   ),
-                                  Text(
-                                    '${medicine['total_quantity'] ?? 0} units',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+
+                  // Sales by Staff
+                  if (report['sales_by_staff'] != null && report['sales_by_staff'].isNotEmpty) ...[
+                    Text(
+                      'Staff Performance',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: report['sales_by_staff'].length,
+                      itemBuilder: (context, index) {
+                        final staff = report['sales_by_staff'][index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.purple.withOpacity(0.1),
+                              child: Text(
+                                (staff['name'] ?? 'U')[0],
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.purple,
+                                ),
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    // Sales by Staff
-                    if (report['sales_by_staff'] != null && report['sales_by_staff'].isNotEmpty) ...[
-                      Text(
-                        'Staff Performance',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: report['sales_by_staff'].length,
-                        itemBuilder: (context, index) {
-                          final staff = report['sales_by_staff'][index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.purple.withOpacity(0.1),
-                                child: Text(
-                                  (staff['name'] ?? 'U')[0],
+                            title: Text(staff['name'] ?? ''),
+                            subtitle: Text('${staff['transactions'] ?? 0} transactions'),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'UGX ${(staff['total'] ?? 0).toStringAsFixed(0)}',
                                   style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                     color: Colors.purple,
                                   ),
                                 ),
-                              ),
-                              title: Text(staff['name'] ?? ''),
-                              subtitle: Text('${staff['transactions'] ?? 0} transactions'),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'UGX ${(staff['total'] ?? 0).toStringAsFixed(0)}',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.purple,
-                                    ),
+                                Text(
+                                  'Avg: UGX ${(staff['avg_transaction'] ?? 0).toStringAsFixed(0)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
                                   ),
-                                  Text(
-                                    'Avg: UGX ${(staff['avg_transaction'] ?? 0).toStringAsFixed(0)}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
+                ],
                 ],
               ),
             ),

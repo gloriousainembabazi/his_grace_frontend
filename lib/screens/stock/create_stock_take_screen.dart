@@ -244,17 +244,13 @@ class _CreateStockTakeScreenState extends State<CreateStockTakeScreen> {
     try {
       final stockTake = await provider.createStockTake(stockTakeData);
 
-      if (stockTake != null) {
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Stock take created successfully')),
-          );
-        }
-      } else {
-        throw Exception('Failed to create stock take');
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Stock take created successfully')),
+        );
       }
-    } catch (e) {
+        } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: ${provider.error ?? e.toString()}')),

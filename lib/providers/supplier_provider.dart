@@ -1,68 +1,37 @@
-// lib/providers/supplier_provider.dart
-
 import 'package:flutter/material.dart';
-
-class Supplier {
-  final String id;
-  final String name;
-  final String contact;
-  // Add more fields as needed
-
-  Supplier({
-    required this.id,
-    required this.name,
-    required this.contact,
-  });
-}
+import '../services/api_service.dart';
 
 class SupplierProvider extends ChangeNotifier {
-  // List of suppliers
-  List<Supplier> _suppliers = [];
-
-  // Getter
-  List<Supplier> get suppliers => _suppliers;
-
-  // Error handling
-  String? error;
-
-  // Fetch suppliers (dummy example, replace with API call)
-  Future<void> fetchSuppliers() async {
+  final ApiService _apiService;
+  
+  List<dynamic> _suppliers = [];
+  bool _isLoading = false;
+  String? _error;
+  
+  SupplierProvider(this._apiService);
+  
+  List<dynamic> get suppliers => _suppliers;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  
+  Future<void> loadSuppliers() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
     try {
-      // Simulate API call delay
-      await Future.delayed(const Duration(seconds: 1));
-
-      // Example dummy data
-      _suppliers = [
-        Supplier(id: '1', name: 'Supplier A', contact: '0712345678'),
-        Supplier(id: '2', name: 'Supplier B', contact: '0787654321'),
-      ];
-
-      error = null;
-      notifyListeners();
+      final response = await _apiService.get("/suppliers/");
+      
+      if (response.isSuccess && response.data != null) {
+        _suppliers = response.data['results'] ?? response.data;
+      } else {
+        _error = response.error ?? 'Failed to load suppliers';
+      }
     } catch (e) {
-      error = e.toString();
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
       notifyListeners();
-    }
-  }
-
-  // Add a supplier
-  Future<void> addSupplier(Supplier supplier) async {
-    try {
-      _suppliers.add(supplier);
-      error = null;
-      notifyListeners();
-    } catch (e) {
-      error = e.toString();
-      notifyListeners();
-    }
-  }
-
-  // Find supplier by id
-  Supplier? getSupplierById(String id) {
-    try {
-      return _suppliers.firstWhere((supplier) => supplier.id == id);
-    } catch (e) {
-      return null;
     }
   }
 }

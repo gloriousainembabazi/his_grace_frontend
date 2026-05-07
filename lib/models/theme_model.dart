@@ -1,3 +1,5 @@
+// lib/models/theme_model.dart
+
 import 'package:flutter/material.dart';
 
 enum AppTheme {
@@ -25,7 +27,7 @@ extension AppThemeExtension on AppTheme {
       case AppTheme.dark:
         return Icons.dark_mode;
       case AppTheme.system:
-        return Icons.settings;
+        return Icons.settings_brightness;
     }
   }
 }

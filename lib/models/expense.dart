@@ -25,15 +25,40 @@ class Expense {
 
   factory Expense.fromJson(Map<String, dynamic> json) {
     return Expense(
-      id: json['id'],
-      expenseNumber: json['expense_number'],
-      category: json['category'],
-      description: json['description'],
-      amount: double.parse(json['amount']?.toString() ?? '0'),
-      expenseDate: DateTime.parse(json['expense_date']),
-      paymentMethod: json['payment_method'],
-      receiptNumber: json['receipt_number'] ?? '',
-      vendorName: json['vendor_name'] ?? '',
+      id: json['id'] ?? 0,
+      expenseNumber: json['expense_number'] ?? json['expenseNumber'] ?? '',
+      category: json['category'] ?? '',
+      description: json['description'] ?? '',
+      amount: (json['amount'] ?? 0).toDouble(),
+      expenseDate: json['expense_date'] != null 
+          ? DateTime.parse(json['expense_date']) 
+          : (json['expenseDate'] != null 
+              ? DateTime.parse(json['expenseDate']) 
+              : DateTime.now()),
+      paymentMethod: json['payment_method'] ?? json['paymentMethod'] ?? 'cash',
+      receiptNumber: json['receipt_number'] ?? json['receiptNumber'] ?? '',
+      vendorName: json['vendor_name'] ?? json['vendorName'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'expense_number': expenseNumber,
+      'category': category,
+      'description': description,
+      'amount': amount,
+      'expense_date': expenseDate.toIso8601String().split('T')[0],
+      'payment_method': paymentMethod,
+      'receipt_number': receiptNumber,
+      'vendor_name': vendorName,
+    };
+  }
+  
+  String get formattedDate {
+    return '${expenseDate.day}/${expenseDate.month}/${expenseDate.year}';
+  }
+  
+  String get formattedAmount {
+    return 'UGX ${amount.toStringAsFixed(0)}';
   }
 }

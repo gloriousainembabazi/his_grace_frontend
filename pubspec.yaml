@@ -1,5 +1,5 @@
 name: his_grace_drugshop
-description: His Grace Drugshop Management System - Complete pharmacy management solution with prescriptions, credits, expenses, and inventory management
+description: His Grace Drugshop Prescription Management App - Complete pharmacy solution for prescriptions, patient management, and document handling
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -12,22 +12,34 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   
-  # UI Components
-  cupertino_icons: ^1.0.6
-  google_fonts: ^8.0.2
-  flutter_svg: ^2.0.9
-  animations: ^2.0.8
-  shimmer: ^3.0.0
-  cached_network_image: ^3.3.0
-  
-  # State Management
-  provider: ^6.1.1
-  
-  # Networking
+  # HTTP & API
+  http: ^1.1.0
   dio: ^5.4.0
   pretty_dio_logger: ^1.3.1
   retrofit: ^4.0.3
   json_annotation: ^4.8.1
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # Image Picking & Camera
+  image_picker: ^1.0.5
+  camera: ^0.10.5
+  file_picker: ^10.3.10
+  
+  # Printing & PDF
+  printing: ^5.14.3
+  pdf: ^3.12.0
+  open_file: ^3.3.2
+  
+  # Barcode Scanning
+  mobile_scanner: ^7.2.0
+  qr_flutter: ^4.1.0
+  barcode: ^2.2.7
+  
+  # Date Formatting
+  intl: ^0.20.2
+  table_calendar: ^3.0.9
   
   # Local Storage
   shared_preferences: ^2.2.2
@@ -35,29 +47,35 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.9.0
   
-  # Image Picker & Camera
-  image_picker: ^1.0.5
-  file_picker: ^10.3.10
+  # UI Components
+  cupertino_icons: ^1.0.6
+  google_fonts: ^8.0.2
+  flutter_svg: ^2.0.9
+  animations: ^2.0.8
+  shimmer: ^3.0.0
+  cached_network_image: ^3.3.0
+  lottie: ^3.3.0
+  flutter_slidable: ^4.0.3
+  pull_to_refresh: ^2.0.0
+  badges: ^3.1.2
+  smooth_page_indicator: ^2.0.1
   
-  # Date/Time
-  intl: ^0.20.2
-  table_calendar: ^3.0.9
-  
-  # Charts & Data Visualization
+  # Charts
   fl_chart: ^1.2.0
-  
-  # QR & Barcode
-  qr_flutter: ^4.1.0
-  mobile_scanner: ^7.2.0
-  barcode: ^2.2.7
-  
-  # PDF & Printing
-  pdf: ^3.12.0
-  printing: ^5.14.3
-  open_file: ^3.3.2
+  pie_chart: ^5.4.0
   
   # Excel Export
   excel: ^4.0.6
+  
+  # PDF Viewer
+  flutter_pdfview: ^1.3.2
+  
+  # Forms & Validation
+  flutter_form_builder: ^10.2.0
+  form_builder_validators: ^11.2.0
+  
+  # Search & Filter
+  flutter_typeahead: ^5.2.0
   
   # Utilities
   path_provider: ^2.1.1
@@ -67,44 +85,17 @@ dependencies:
   package_info_plus: ^9.0.0
   permission_handler: ^12.0.1
   share_plus: ^12.0.1
+  image: ^4.3.0
+  archive: ^3.6.1
   
   # Notifications
   flutter_local_notifications: ^20.1.0
   
-  # Forms & Validation
-  flutter_form_builder: ^10.2.0
-  form_builder_validators: ^11.2.0
-  
-  # Search & Filter
-  flutter_typeahead: ^5.2.0
-  
-  # PDF Viewer
-  flutter_pdfview: ^1.3.2
-  
-  # Animations
-  lottie: ^3.3.0
-  
-  # UI Helpers
-  flutter_slidable: ^4.0.3
-  pull_to_refresh: ^2.0.0
-  
-  # Charts
-  pie_chart: ^5.4.0
-  
   # Authentication
   local_auth: ^3.0.1
   
-  # Onboarding
-  smooth_page_indicator: ^2.0.1
-  
-  # Badges
-  badges: ^3.1.2
-  
-  # Image Processing
-  image: ^4.3.0
-  
-  # File Handling
-  archive: ^3.6.1
+  # WebSockets for Real-time Graphs
+  web_socket_channel: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -112,15 +103,40 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.13.1
   json_serializable: ^6.13.1
-  
+
 flutter:
   uses-material-design: true
   
   assets:
-    # Only include assets that actually exist
+    # Images
+    - assets/images/
     - assets/images/logo.jpg
     - assets/images/placeholder.png
-    # Add more assets as you create them
-    # - assets/images/logo.png
-    # - assets/images/no_image.png
     
+    # Icons
+    - assets/icons/
+    
+    # Animations
+    - assets/animations/
+    
+    # Fonts (if you have custom fonts)
+    - assets/fonts/
+    
+    # Onboarding assets
+    - assets/onboarding/
+    
+    # Default data
+    - assets/data/
+  
+  # Custom fonts (optional - uncomment if you have font files)
+  # fonts:
+  #   - family: Poppins
+  #     fonts:
+  #       - asset: assets/fonts/Poppins-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Poppins-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Poppins-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Poppins-Bold.ttf
+  #         weight: 700

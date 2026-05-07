@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/prescription_provider.dart';
 import '../../utils/constants.dart';
+import 'prescription_detail_screen.dart';
 
 class PrescriptionListScreen extends StatefulWidget {
   const PrescriptionListScreen({super.key});
@@ -24,7 +25,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
   Future<void> _loadPrescriptions() async {
     final provider = Provider.of<PrescriptionProvider>(context, listen: false);
-    await provider.loadPrescriptions();
+    await provider.loadPrescriptions(refresh: true);
   }
 
   @override
@@ -78,6 +79,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                       _buildFilterChip('Dispensed', 'dispensed'),
                       const SizedBox(width: 8),
                       _buildFilterChip('Cancelled', 'cancelled'),
+                      const SizedBox(width: 8),
+                      _buildFilterChip('Partial', 'partial'),
                     ],
                   ),
                 ),
@@ -88,7 +91,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       ),
       body: Consumer<PrescriptionProvider>(
         builder: (context, provider, child) {
-          if (provider.isLoading) {
+          if (provider.isLoading && provider.prescriptions.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -110,45 +113,14 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
             );
           }
 
-          var prescriptions = provider.prescriptions;
-
-          // Apply search filter
-          if (_searchQuery.isNotEmpty) {
-            prescriptions = prescriptions.where((pres) =>
-                pres.prescriptionNumber
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase()) ||
-                pres.patientName
-                    .toLowerCase()
-                    .contains(_searchQuery.toLowerCase())).toList();
-          }
-
-          // Apply status filter
-          if (_statusFilter != 'all') {
-            prescriptions = prescriptions
-                .where((pres) => pres.status == _statusFilter)
-                .toList();
-          }
+          var prescriptions = provider.filterPrescriptions(
+            status: _statusFilter,
+            query: _searchQuery,
+          );
 
           if (prescriptions.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.medical_services_outlined,
-                      size: 64, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  const Text('No prescriptions found'),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/create-prescription');
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('New Prescription'),
-                  ),
-                ],
-              ),
+            return const Center(
+              child: Text('No prescriptions found'),
             );
           }
 
@@ -161,7 +133,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: _getStatusColor(prescription.status),
+                    backgroundColor: prescription.statusColor,
                     child: const Icon(Icons.medical_services, color: Colors.white),
                   ),
                   title: Text(prescription.prescriptionNumber),
@@ -179,10 +151,9 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(prescription.status),
+                          color: prescription.statusColor,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -200,10 +171,13 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                     ],
                   ),
                   onTap: () {
-                    Navigator.pushNamed(
+                    Navigator.push(
                       context,
-                      '/prescription-detail',
-                      arguments: {'id': prescription.id},
+                      MaterialPageRoute(
+                        builder: (_) => PrescriptionDetailScreen(
+                          prescriptionId: prescription.id,
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -230,18 +204,5 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         color: _statusFilter == value ? Colors.white : Colors.black,
       ),
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'dispensed':
-        return Colors.green;
-      case 'cancelled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 }

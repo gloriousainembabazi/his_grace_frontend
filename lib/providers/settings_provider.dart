@@ -1,3 +1,5 @@
+// lib/providers/settings_provider.dart
+
 import 'package:flutter/material.dart';
 import '../models/theme_model.dart';
 import '../services/storage_service.dart';
@@ -53,13 +55,11 @@ class SettingsProvider extends ChangeNotifier {
 
   void setLanguage(String lang) {
     _language = lang;
-    // Save to storage
     notifyListeners();
   }
 
   void toggleAutoBackup() {
     _autoBackup = !_autoBackup;
-    // Save to storage
     notifyListeners();
   }
 

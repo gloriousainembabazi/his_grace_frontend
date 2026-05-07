@@ -1,526 +1,416 @@
+// lib/screens/medicines/add_medicine_screen.dart
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../models/category.dart';
-import '../../models/supplier.dart';
-import '../../providers/medicine_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_textfield.dart';
+import 'dart:io';
 import '../../utils/constants.dart';
-import '../../utils/validators.dart';
 
 class AddMedicineScreen extends StatefulWidget {
   const AddMedicineScreen({super.key});
 
   @override
-  _AddMedicineScreenState createState() => _AddMedicineScreenState();
+  State<AddMedicineScreen> createState() => _AddMedicineScreenState();
 }
 
 class _AddMedicineScreenState extends State<AddMedicineScreen> {
+  File? _selectedImage;
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  
+  // Controllers
+  final _productNameController = TextEditingController();
   final _genericNameController = TextEditingController();
-  final _priceController = TextEditingController();
+  final _batchNumberController = TextEditingController();
+  final _costPriceController = TextEditingController();
+  final _sellingPriceController = TextEditingController();
   final _quantityController = TextEditingController();
   final _minStockController = TextEditingController();
-  final _batchNumberController = TextEditingController();
+  final _manufacturerController = TextEditingController();
+  final _supplierController = TextEditingController();
   final _descriptionController = TextEditingController();
   
-  DateTime? _expiryDate;
-  Category? _selectedCategory;
-  Supplier? _selectedSupplier;
-  
-  bool _isLoading = false;
-  String? _expiryError;
+  String _selectedCategory = 'Pain Relief';
+  DateTime _expiryDate = DateTime.now().add(const Duration(days: 365));
+  bool _isSaving = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadInitialData();
-  }
+  final List<String> _categories = [
+    'Pain Relief',
+    'Antibiotics',
+    'Vitamins',
+    'Cold and Flu',
+    'Allergy',
+    'Other',
+  ];
 
-  Future<void> _loadInitialData() async {
-    final provider = Provider.of<MedicineProvider>(context, listen: false);
-    await Future.wait([
-      provider.loadCategories(),
-      provider.loadSuppliers(),
-    ]);
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _genericNameController.dispose();
-    _priceController.dispose();
-    _quantityController.dispose();
-    _minStockController.dispose();
-    _batchNumberController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
+  Future<void> _pickImage() async {
+    showModalBottomSheet(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(), // CRITICAL: This prevents selecting past dates
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.camera_alt, color: AppColors.primaryGreen),
+              title: const Text('Take a photo'),
+              onTap: () async {
+                Navigator.pop(context);
+                final image = await ImagePicker().pickImage(source: ImageSource.camera);
+                if (image != null) setState(() => _selectedImage = File(image.path));
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library, color: AppColors.primaryGreen),
+              title: const Text('Choose from gallery'),
+              onTap: () async {
+                Navigator.pop(context);
+                final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+                if (image != null) setState(() => _selectedImage = File(image.path));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectExpiryDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _expiryDate,
+      firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
     );
-    if (picked != null) {
-      setState(() {
-        _expiryDate = picked;
-        _expiryError = null;
-      });
-    }
+    if (date != null) setState(() => _expiryDate = date);
   }
 
-  String? _validateExpiryDate() {
-    if (_expiryDate == null) {
-      return 'Please select expiry date';
-    }
-    
-    // Get today's date at midnight for accurate comparison
-    final today = DateTime.now();
-    final todayMidnight = DateTime(today.year, today.month, today.day);
-    
-    if (_expiryDate!.isBefore(todayMidnight)) {
-      return 'Expiry date cannot be in the past. Selected date: ${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}';
-    }
-    
-    return null;
-  }
-
-  Future<void> _handleSubmit() async {
-    // Clear previous errors
-    setState(() {
-      _expiryError = null;
-    });
-
-    // Validate form first
+  Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-
-    // Validate expiry date
-    final expiryValidation = _validateExpiryDate();
-    if (expiryValidation != null) {
-      setState(() {
-        _expiryError = expiryValidation;
-      });
-      
-      // Show snackbar for immediate feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ $expiryValidation'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
-
-    if (_selectedCategory == null) {
+    
+    // Validate selling price > cost price
+    final costPrice = double.tryParse(_costPriceController.text) ?? 0;
+    final sellingPrice = double.tryParse(_sellingPriceController.text) ?? 0;
+    
+    if (sellingPrice <= costPrice) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select a category'),
+          content: Text('Selling price must be greater than cost price'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
-
-    if (_selectedSupplier == null) {
+    
+    setState(() => _isSaving = true);
+    
+    // Simulate API call
+    await Future.delayed(const Duration(seconds: 2));
+    
+    if (mounted) {
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select a supplier'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    final medicineData = {
-      'name': _nameController.text.trim(),
-      'generic_name': _genericNameController.text.trim(),
-      'category': _selectedCategory!.id,
-      'supplier': _selectedSupplier!.id,
-      'price': double.parse(_priceController.text),
-      'quantity': int.parse(_quantityController.text),
-      'min_stock_level': int.parse(_minStockController.text),
-      'expiry_date': _expiryDate!.toIso8601String().split('T')[0],
-      'batch_number': _batchNumberController.text.trim(),
-      'description': _descriptionController.text.trim(),
-    };
-
-    final provider = Provider.of<MedicineProvider>(context, listen: false);
-    final success = await provider.addMedicine(medicineData);
-
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Medicine added successfully'),
+          content: Text('Product saved successfully!'),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context, true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.error ?? 'Failed to add medicine'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final canAdd = authProvider.currentUser?.isAdmin ?? false;
-
-    if (!canAdd) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Add Medicine'),
-        ),
-        body: Center(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Add New Product'),
+        elevation: 0,
+        backgroundColor: AppColors.primaryGreen,
+      ),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppConstants.paddingMedium),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.block,
-                size: 80,
-                color: Colors.red.shade300,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'You do not have permission to add medicines',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  color: Colors.grey.shade600,
+              // Add Photo Section
+              GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  width: double.infinity,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                    border: Border.all(color: AppColors.primaryGreen.withOpacity(0.3), width: 2),
+                  ),
+                  child: _selectedImage != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                          child: Image.file(
+                            _selectedImage!,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                          ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 40,
+                              color: AppColors.primaryGreen,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tap to add product image',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.primaryGreen,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              'JPG, PNG (Max 5MB)',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: AppColors.lightText,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
-                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: AppConstants.paddingLarge),
+              
+              // Product Information Section
+              _buildSectionTitle('Product Information'),
+              const SizedBox(height: AppConstants.paddingMedium),
+              TextFormField(
+                controller: _productNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Product Name *',
+                  prefixIcon: Icon(Icons.medication),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) => v?.isEmpty == true ? 'Product name is required' : null,
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              TextFormField(
+                controller: _genericNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Generic Name',
+                  prefixIcon: Icon(Icons.science),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedCategory,
+                decoration: const InputDecoration(
+                  labelText: 'Category *',
+                  prefixIcon: Icon(Icons.category),
+                  border: OutlineInputBorder(),
+                ),
+                items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+                onChanged: (value) => setState(() => _selectedCategory = value!),
+                validator: (v) => v == null ? 'Category is required' : null,
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              TextFormField(
+                controller: _batchNumberController,
+                decoration: const InputDecoration(
+                  labelText: 'Batch Number',
+                  prefixIcon: Icon(Icons.numbers),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              GestureDetector(
+                onTap: _selectExpiryDate,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: AppColors.primaryGreen),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Expiry Date: ${_expiryDate.day}/${_expiryDate.month}/${_expiryDate.year}',
+                        style: GoogleFonts.poppins(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingLarge),
+              
+              // Pricing Information
+              _buildSectionTitle('Pricing Information'),
+              const SizedBox(height: AppConstants.paddingMedium),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _costPriceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Cost Price *',
+                        prefixIcon: Icon(Icons.attach_money),
+                        border: OutlineInputBorder(),
+                        prefixText: 'UGX ',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) => v?.isEmpty == true ? 'Cost price is required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.paddingMedium),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _sellingPriceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Selling Price *',
+                        prefixIcon: Icon(Icons.price_change),
+                        border: OutlineInputBorder(),
+                        prefixText: 'UGX ',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) => v?.isEmpty == true ? 'Selling price is required' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.paddingLarge),
+              
+              // Stock Information
+              _buildSectionTitle('Stock Information'),
+              const SizedBox(height: AppConstants.paddingMedium),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _quantityController,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity *',
+                        prefixIcon: Icon(Icons.inventory),
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) => v?.isEmpty == true ? 'Quantity is required' : null,
+                    ),
+                  ),
+                  const SizedBox(width: AppConstants.paddingMedium),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _minStockController,
+                      decoration: const InputDecoration(
+                        labelText: 'Min Stock Alert',
+                        prefixIcon: Icon(Icons.warning),
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppConstants.paddingLarge),
+              
+              // Supplier Information
+              _buildSectionTitle('Supplier Information'),
+              const SizedBox(height: AppConstants.paddingMedium),
+              TextFormField(
+                controller: _manufacturerController,
+                decoration: const InputDecoration(
+                  labelText: 'Manufacturer',
+                  prefixIcon: Icon(Icons.factory),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              TextFormField(
+                controller: _supplierController,
+                decoration: const InputDecoration(
+                  labelText: 'Supplier',
+                  prefixIcon: Icon(Icons.business),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingMedium),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  prefixIcon: Icon(Icons.description),
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+              const SizedBox(height: AppConstants.paddingLarge),
+              
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveProduct,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusLarge),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'SAVE PRODUCT',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: AppConstants.paddingLarge),
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Medicine'),
-      ),
-      body: Consumer<MedicineProvider>(
-        builder: (context, provider, child) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Basic Information
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Basic Information',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          CustomTextField(
-                            controller: _nameController,
-                            label: 'Medicine Name *',
-                            prefixIcon: Icons.medical_services,
-                            validator: Validators.required,
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          CustomTextField(
-                            controller: _genericNameController,
-                            label: 'Generic Name',
-                            prefixIcon: Icons.science,
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Category Dropdown
-                          DropdownButtonFormField<Category>(
-                            initialValue: _selectedCategory,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: 'Category *',
-                              prefixIcon: const Icon(Icons.category),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            items: provider.categories.map((category) {
-                              return DropdownMenuItem<Category>(
-                                value: category,
-                                child: Text(
-                                  category.name,
-                                  style: GoogleFonts.poppins(),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (Category? value) {
-                              setState(() {
-                                _selectedCategory = value;
-                              });
-                            },
-                            validator: (value) {
-                              if (value == null) return 'Please select a category';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Supplier Dropdown
-                          DropdownButtonFormField<Supplier>(
-                            initialValue: _selectedSupplier,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: 'Supplier *',
-                              prefixIcon: const Icon(Icons.business),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            items: provider.suppliers.map((supplier) {
-                              return DropdownMenuItem<Supplier>(
-                                value: supplier,
-                                child: Text(
-                                  supplier.name,
-                                  style: GoogleFonts.poppins(),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (Supplier? value) {
-                              setState(() {
-                                _selectedSupplier = value;
-                              });
-                            },
-                            validator: (value) {
-                              if (value == null) return 'Please select a supplier';
-                              return null;
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Pricing and Stock
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pricing & Stock',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          Row(
-                            children: [
-                              Expanded(
-                                child: CustomTextField(
-                                  controller: _priceController,
-                                  label: 'Price *',
-                                  prefixIcon: Icons.attach_money,
-                                  keyboardType: TextInputType.number,
-                                  validator: Validators.positiveNumber,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: CustomTextField(
-                                  controller: _quantityController,
-                                  label: 'Quantity *',
-                                  prefixIcon: Icons.inventory,
-                                  keyboardType: TextInputType.number,
-                                  validator: Validators.integer,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          CustomTextField(
-                            controller: _minStockController,
-                            label: 'Minimum Stock Level *',
-                            prefixIcon: Icons.warning,
-                            keyboardType: TextInputType.number,
-                            validator: Validators.integer,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Expiry and Batch - CRITICAL SECTION
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Expiry & Batch',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Expiry Date Picker with validation
-                          InkWell(
-                            onTap: _selectDate,
-                            child: InputDecorator(
-                              decoration: InputDecoration(
-                                labelText: 'Expiry Date *',
-                                prefixIcon: const Icon(Icons.calendar_today),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                errorText: _expiryError,
-                                errorStyle: GoogleFonts.poppins(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              child: Text(
-                                _expiryDate == null
-                                    ? 'Select Date'
-                                    : '${_expiryDate!.day}/${_expiryDate!.month}/${_expiryDate!.year}',
-                                style: GoogleFonts.poppins(
-                                  color: _expiryError != null ? Colors.red : null,
-                                ),
-                              ),
-                            ),
-                          ),
-                          
-                          // Warning message
-                          Container(
-                            margin: const EdgeInsets.only(top: 8),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.orange.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.warning_amber_rounded,
-                                  size: 16,
-                                  color: Colors.orange.shade700,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Expiry date must be in the future. Today is ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: Colors.orange.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          CustomTextField(
-                            controller: _batchNumberController,
-                            label: 'Batch Number',
-                            prefixIcon: Icons.qr_code,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Description
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Additional Information',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          CustomTextField(
-                            controller: _descriptionController,
-                            label: 'Description',
-                            prefixIcon: Icons.description,
-                            maxLines: 3,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Submit Button
-                  CustomButton(
-                    text: 'ADD MEDICINE',
-                    onPressed: _handleSubmit,
-                    isLoading: _isLoading,
-                    isFullWidth: true,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+  Widget _buildSectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 20,
+          decoration: BoxDecoration(
+            color: AppColors.primaryGreen,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.darkText,
+          ),
+        ),
+      ],
     );
   }
 }

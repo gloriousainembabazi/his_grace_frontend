@@ -1,198 +1,228 @@
+// lib/providers/sale_provider.dart
+
 import 'package:flutter/material.dart';
-import '../models/sale.dart';
 import '../services/api_service.dart';
+import '../models/sale.dart';
 
 class SaleProvider extends ChangeNotifier {
   final ApiService _apiService;
   
   List<Sale> _sales = [];
   List<Sale> _dailySales = [];
-  double _dailyTotal = 0;
-  int _dailyTransactions = 0;
   bool _isLoading = false;
   String? _error;
-  int _currentPage = 1;
-  bool _hasMorePages = true;
-
+  
   SaleProvider(this._apiService);
-
-  // Getters
+  
   List<Sale> get sales => _sales;
   List<Sale> get dailySales => _dailySales;
-  double get dailyTotal => _dailyTotal;
-  int get dailyTransactions => _dailyTransactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
-
-  // Load all sales with pagination handling
+  
+  // Daily total getter for reports
+  double get dailyTotal {
+    return _dailySales.fold(0.0, (sum, sale) => sum + sale.totalPrice);
+  }
+  
+  // Calculate total revenue from all sales
+  double get totalRevenue {
+    return _sales.fold(0.0, (sum, sale) => sum + sale.totalPrice);
+  }
+  
+  // Calculate today's revenue
+  double get todayRevenue {
+    final today = DateTime.now();
+    final todaySales = _sales.where((sale) => 
+      sale.saleDate.year == today.year &&
+      sale.saleDate.month == today.month &&
+      sale.saleDate.day == today.day
+    );
+    return todaySales.fold(0.0, (sum, sale) => sum + sale.totalPrice);
+  }
+  
+  // Calculate yesterday's revenue
+  double get yesterdayRevenue {
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
+    final yesterdaySales = _sales.where((sale) => 
+      sale.saleDate.year == yesterday.year &&
+      sale.saleDate.month == yesterday.month &&
+      sale.saleDate.day == yesterday.day
+    );
+    return yesterdaySales.fold(0.0, (sum, sale) => sum + sale.totalPrice);
+  }
+  
+  // Calculate total quantity sold
+  int get totalQuantity {
+    return _sales.fold(0, (sum, sale) => sum + sale.quantity);
+  }
+  
+  // Get total number of sales transactions
+  int get totalTransactions {
+    return _sales.length;
+  }
+  
   Future<void> loadSales({bool refresh = false}) async {
     if (refresh) {
       _sales = [];
-      _currentPage = 1;
-      _hasMorePages = true;
     }
-
-    if (!_hasMorePages || _isLoading) return;
-
+    
     _isLoading = true;
     _error = null;
     notifyListeners();
-
+    
     try {
-      final response = await _apiService.getSales(params: {
-        'page': _currentPage,
-      });
-
-      // Handle both paginated and non-paginated responses
-      List<dynamic> data;
-      if (response.data is Map && response.data['results'] != null) {
-        // Paginated response
-        data = response.data['results'];
-        _hasMorePages = response.data['next'] != null;
-      } else if (response.data is List) {
-        // Non-paginated response (plain array)
-        data = response.data;
-        _hasMorePages = false; // No pagination
+      final response = await _apiService.get("/sales/");
+      
+      if (response.isSuccess && response.data != null) {
+        final data = response.data['results'] ?? response.data;
+        _sales = (data as List)
+            .map((item) => Sale.fromJson(item))
+            .toList();
       } else {
-        data = [];
+        _error = response.error ?? 'Failed to load sales';
       }
-
-      final newSales = data.map((json) => Sale.fromJson(json)).toList();
-
-      if (newSales.isEmpty) {
-        _hasMorePages = false;
-      } else {
-        _sales.addAll(newSales);
-        _currentPage++;
-      }
-
-      _error = null;
     } catch (e) {
-      _error = 'Failed to load sales: $e';
-      print('Error loading sales: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    notifyListeners();
   }
-
-  // Load daily sales
+  
   Future<void> loadDailySales() async {
-    try {
-      final response = await _apiService.getDailySales();
-      final data = response.data;
-      
-      // Parse with safety checks
-      _dailyTotal = _parseDouble(data['total_sales']) ?? 0;
-      _dailyTransactions = _parseInt(data['total_transactions']) ?? 0;
-      
-      final List<dynamic> salesData = data['sales'] is List ? data['sales'] : [];
-      _dailySales = salesData.map((json) => Sale.fromJson(json)).toList();
-      
-      notifyListeners();
-    } catch (e) {
-      print('Error loading daily sales: $e');
-    }
-  }
-
-  // Get sale by ID
-  Future<Sale?> getSaleById(int id) async {
-    try {
-      final response = await _apiService.getSale(id);
-      return Sale.fromJson(response.data);
-    } catch (e) {
-      print('Error getting sale: $e');
-      return null;
-    }
-  }
-
-  // Create sale
-  Future<bool> createSale(Map<String, dynamic> saleData) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-
+    
     try {
-      final response = await _apiService.createSale(saleData);
-      final newSale = Sale.fromJson(response.data);
+      final response = await _apiService.get("/sales/daily/");
       
-      _sales.insert(0, newSale);
-      _dailySales.insert(0, newSale);
-      
-      // Update daily totals
-      _dailyTotal += newSale.totalPrice;
-      _dailyTransactions++;
-      
-      _error = null;
-      _isLoading = false;
-      notifyListeners();
-      return true;
+      if (response.isSuccess && response.data != null) {
+        final data = response.data;
+        final salesData = data['sales'] ?? data;
+        _dailySales = (salesData as List)
+            .map((item) => Sale.fromJson(item))
+            .toList();
+      } else {
+        _error = response.error ?? 'Failed to load daily sales';
+      }
     } catch (e) {
-      _error = 'Failed to create sale: $e';
-      print('Error creating sale: $e');
+      _error = e.toString();
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return false;
     }
   }
-
-  // Get sales by date range
-  Future<List<Sale>> getSalesByDateRange(DateTime start, DateTime end) async {
+  
+  Future<Sale?> getSaleById(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
     try {
-      final response = await _apiService.getSalesByDateRange(
-        start.toIso8601String().split('T')[0],
-        end.toIso8601String().split('T')[0],
+      final response = await _apiService.get("/sales/$id/");
+      
+      if (response.isSuccess && response.data != null) {
+        return Sale.fromJson(response.data);
+      } else {
+        _error = response.error ?? 'Failed to load sale';
+        return null;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return null;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  Future<bool> createSale(Map<String, dynamic> data) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      final response = await _apiService.createSale(data);
+      
+      if (response.isSuccess) {
+        await loadDailySales();
+        await loadSales(refresh: true);
+        return true;
+      } else {
+        _error = response.error ?? 'Failed to create sale';
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  Future<List<Sale>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      final response = await _apiService.getSalesReport(
+        startDate: startDate.toIso8601String().split('T')[0],
+        endDate: endDate.toIso8601String().split('T')[0],
       );
       
-      final List<dynamic> data = response.data is List ? response.data : [];
-      return data.map((json) => Sale.fromJson(json)).toList();
+      if (response.isSuccess && response.data != null) {
+        final sales = response.data['results'] ?? response.data;
+        _isLoading = false;
+        notifyListeners();
+        return (sales as List)
+            .map((item) => Sale.fromJson(item))
+            .toList();
+      } else {
+        _error = response.error ?? 'Failed to get sales by date range';
+        _isLoading = false;
+        notifyListeners();
+        return [];
+      }
     } catch (e) {
-      print('Error getting sales by date: $e');
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
       return [];
     }
   }
-
-  // Helper method to safely parse double values
-  double? _parseDouble(dynamic value) {
-    if (value == null) return null;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) {
-      try {
-        return double.parse(value);
-      } catch (e) {
-        return null;
+  
+  // Get sales grouped by month
+  Map<String, List<Sale>> getSalesByMonth() {
+    final Map<String, List<Sale>> groupedSales = {};
+    
+    for (var sale in _sales) {
+      final monthKey = '${sale.saleDate.year}-${sale.saleDate.month}';
+      if (!groupedSales.containsKey(monthKey)) {
+        groupedSales[monthKey] = [];
       }
+      groupedSales[monthKey]!.add(sale);
     }
-    return null;
+    
+    return groupedSales;
   }
-
-  // Helper method to safely parse int values
-  int? _parseInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is double) return value.toInt();
-    if (value is String) {
-      try {
-        return int.parse(value);
-      } catch (e) {
-        return null;
-      }
+  
+  // Get monthly revenue for chart
+  Map<String, double> getMonthlyRevenue() {
+    final Map<String, double> monthlyRevenue = {};
+    
+    for (var sale in _sales) {
+      final monthKey = '${sale.saleDate.year}-${sale.saleDate.month}';
+      monthlyRevenue[monthKey] = (monthlyRevenue[monthKey] ?? 0) + sale.totalPrice;
     }
-    return null;
+    
+    return monthlyRevenue;
   }
-
-  // Clear error
+  
   void clearError() {
     _error = null;
     notifyListeners();
-  }
-
-  // Refresh all sales data
-  Future<void> refreshAll() async {
-    await Future.wait([
-      loadSales(refresh: true),
-      loadDailySales(),
-    ]);
   }
 }

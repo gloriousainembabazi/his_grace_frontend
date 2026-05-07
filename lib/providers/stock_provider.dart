@@ -1,31 +1,32 @@
-// lib/providers/stock_provider.dart
-
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../models/stock_take.dart';
 
 class StockProvider extends ChangeNotifier {
   final ApiService _apiService;
-  List<StockTake> _stockTakes = [];
+  
+  List<dynamic> _stockTakes = [];
   bool _isLoading = false;
   String? _error;
-
+  
   StockProvider(this._apiService);
-
-  List<StockTake> get stockTakes => _stockTakes;
+  
+  List<dynamic> get stockTakes => _stockTakes;
   bool get isLoading => _isLoading;
   String? get error => _error;
-
-  Future<void> loadStockTakes({Map<String, dynamic>? params}) async {
+  
+  Future<void> loadStockTakes() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-
+    
     try {
-      final response = await _apiService.getStockTakes(params: params);
-      _stockTakes = (response.data as List)
-          .map((json) => StockTake.fromJson(json))
-          .toList();
+      final response = await _apiService.get("/stock-takes/");
+      
+      if (response.isSuccess && response.data != null) {
+        _stockTakes = response.data['results'] ?? response.data;
+      } else {
+        _error = response.error ?? 'Failed to load stock takes';
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -33,34 +34,52 @@ class StockProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-
-  Future<StockTake?> createStockTake(Map<String, dynamic> data) async {
+  
+  Future<bool> createStockTake(Map<String, dynamic> data) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
-
+    
     try {
-      final response = await _apiService.createStockTake(data);
-      final stockTake = StockTake.fromJson(response.data);
-      _stockTakes.insert(0, stockTake);
-      return stockTake;
-    } catch (e) {
-      _error = e.toString();
-      return null;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<bool> completeStockTake(int id) async {
-    try {
-      await _apiService.completeStockTake(id);
-      await loadStockTakes();
-      return true;
+      final response = await _apiService.post("/stock-takes/", data);
+      
+      if (response.isSuccess) {
+        await loadStockTakes();
+        return true;
+      } else {
+        _error = response.error ?? 'Failed to create stock take';
+        return false;
+      }
     } catch (e) {
       _error = e.toString();
       return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+  
+  Future<bool> completeStockTake(int id) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    
+    try {
+      final response = await _apiService.post("/stock-takes/$id/complete/", {});
+      
+      if (response.isSuccess) {
+        await loadStockTakes();
+        return true;
+      } else {
+        _error = response.error ?? 'Failed to complete stock take';
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

@@ -15,7 +15,9 @@ import 'providers/prescription_provider.dart';
 import 'providers/credit_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/stock_provider.dart';
-import 'providers/supplier_provider.dart'; // NEW
+import 'providers/category_provider.dart';
+import 'providers/supplier_provider.dart';
+import 'providers/dashboard_provider.dart';
 
 // Services
 import 'services/api_service.dart';
@@ -30,7 +32,9 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/otp_verification_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
-import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/dashboard/admin_dashboard.dart';
+import 'screens/dashboard/worker_dashboard.dart';
+import 'screens/dashboard/realtime_dashboard.dart';
 import 'screens/medicines/medicine_list_screen.dart';
 import 'screens/medicines/add_medicine_screen.dart';
 import 'screens/medicines/medicine_detail_screen.dart';
@@ -38,8 +42,10 @@ import 'screens/sales/sale_list_screen.dart';
 import 'screens/sales/new_sale_screen.dart';
 import 'screens/sales/sale_detail_screen.dart';
 import 'screens/prescription/prescription_list_screen.dart';
-import 'screens/prescription/create_prescription_screen.dart';
+import 'screens/prescription/create_prescription_screen.dart' as old;
+import 'screens/prescription/new_prescription_screen.dart' as newRx;
 import 'screens/prescription/prescription_detail_screen.dart';
+import 'screens/prescription/upload_prescription_screen.dart';
 import 'screens/credit/credit_list_screen.dart';
 import 'screens/credit/create_credit_screen.dart';
 import 'screens/credit/credit_detail_screen.dart';
@@ -57,6 +63,9 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/settings/change_password_screen.dart';
 import 'screens/settings/about_screen.dart';
+import 'screens/staff/staff_list_screen.dart';
+import 'screens/staff/create_staff_screen.dart';
+import 'screens/staff/staff_form_screen.dart';
 
 // Utils
 import 'utils/theme.dart';
@@ -64,22 +73,25 @@ import 'utils/theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
-  const storage = FlutterSecureStorage();
-  final storageService = StorageService(storage);
-  final apiService = ApiService(storageService);
-  final authService = AuthService(apiService, storageService);
+  try {
+    const storage = FlutterSecureStorage();
+    final storageService = StorageService(storage);
+    final apiService = ApiService(storageService);
+    final authService = AuthService(apiService, storageService);
 
-  // Check if onboarding is completed
-  final prefs = await SharedPreferences.getInstance();
-  final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
 
-  runApp(MyApp(
-    apiService: apiService,
-    authService: authService,
-    storageService: storageService,
-    onboardingCompleted: onboardingCompleted,
-  ));
+    runApp(MyApp(
+      apiService: apiService,
+      authService: authService,
+      storageService: storageService,
+      onboardingCompleted: onboardingCompleted,
+    ));
+  } catch (e) {
+    print('Error initializing app: $e');
+    runApp(const ErrorApp());
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -106,97 +118,93 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MedicineProvider(apiService)),
         ChangeNotifierProvider(create: (_) => SaleProvider(apiService)),
         ChangeNotifierProvider(create: (_) => ReportProvider(apiService)),
-        ChangeNotifierProvider(create: (_) => SettingsProvider(storageService)),
-        ChangeNotifierProvider(create: (_) => PrescriptionProvider(apiService)),
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(storageService),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PrescriptionProvider(apiService),
+        ),
         ChangeNotifierProvider(create: (_) => CreditProvider(apiService)),
         ChangeNotifierProvider(create: (_) => ExpenseProvider(apiService)),
         ChangeNotifierProvider(create: (_) => StockProvider(apiService)),
-        ChangeNotifierProvider(create: (_) => SupplierProvider()), // NEW
+        ChangeNotifierProvider(create: (_) => CategoryProvider(apiService)),
+        ChangeNotifierProvider(create: (_) => SupplierProvider(apiService)),
+        ChangeNotifierProvider(
+          create: (_) => DashboardProvider(apiService),
+        ),
       ],
-      child: Consumer2<AuthProvider, SettingsProvider>(
-        builder: (context, authProvider, settingsProvider, child) {
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
           return MaterialApp(
-            title: 'His_Grace_Drugshop',
             debugShowCheckedModeBanner: false,
+            title: 'His Grace Drugshop',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: settingsProvider.getThemeMode(),
-            initialRoute: _getInitialRoute(authProvider, onboardingCompleted),
-            routes: {
-              '/splash': (context) => const SplashScreen(),
-              '/onboarding': (context) => const OnboardingScreen(),
-              '/login': (context) => const LoginScreen(),
-              '/register': (context) => const RegisterScreen(),
-              '/forgot-password': (context) => const ForgotPasswordScreen(),
-              '/dashboard': (context) => const DashboardScreen(),
-              '/medicines': (context) => const MedicineListScreen(),
-              '/add-medicine': (context) => const AddMedicineScreen(),
-              '/sales': (context) => const SaleListScreen(),
-              '/new-sale': (context) => const NewSaleScreen(),
-              '/reports': (context) => const ReportDashboard(),
-              '/sales-report': (context) => const SalesReportScreen(),
-              '/inventory-report': (context) => const InventoryReportScreen(),
-              '/staff-report': (context) => const StaffReportScreen(),
-              '/profile': (context) => const ProfileScreen(),
-              '/settings': (context) => const SettingsScreen(),
-              '/change-password': (context) => const ChangePasswordScreen(),
-              '/about': (context) => const AboutScreen(),
-              '/prescriptions': (context) => const PrescriptionListScreen(),
-              '/create-prescription': (context) => const CreatePrescriptionScreen(),
-              '/credits': (context) => const CreditListScreen(),
-              '/create-credit': (context) => const CreateCreditScreen(),
-              '/expenses': (context) => const ExpenseListScreen(),
-              '/create-expense': (context) => const CreateExpenseScreen(),
-              '/stock-takes': (context) => const StockTakeListScreen(),
-              '/create-stock-take': (context) => const CreateStockTakeScreen(),
-            },
+            themeMode: ThemeMode.light,
+            home: const SplashScreen(),
             onGenerateRoute: (settings) {
-              if (settings.name == '/medicine-detail') {
-                final args = settings.arguments as Map<String, dynamic>;
+              final args = settings.arguments;
+
+              if (settings.name == '/dashboard') {
+                final user = authProvider.currentUser;
+                final isAdmin = user?.isAdmin ?? false;
                 return MaterialPageRoute(
-                  builder: (context) => MedicineDetailScreen(medicineId: args['id']),
+                  builder: (_) =>
+                      isAdmin ? const AdminDashboard() : const WorkerDashboard(),
                 );
               }
-              if (settings.name == '/sale-detail') {
-                final args = settings.arguments as Map<String, dynamic>;
+
+              if (settings.name == '/realtime-dashboard') {
                 return MaterialPageRoute(
-                  builder: (context) => SaleDetailScreen(saleId: args['id']),
+                  builder: (_) => const RealtimeDashboard(),
                 );
               }
-              if (settings.name == '/prescription-detail') {
-                final args = settings.arguments as Map<String, dynamic>;
+
+              if (settings.name == '/medicine-detail' && args is Map<String, dynamic>) {
                 return MaterialPageRoute(
-                  builder: (context) => PrescriptionDetailScreen(prescriptionId: args['id']),
+                  builder: (_) => MedicineDetailScreen(medicineId: args['id']),
                 );
               }
-              if (settings.name == '/credit-detail') {
-                final args = settings.arguments as Map<String, dynamic>;
+
+              if (settings.name == '/sale-detail' && args is Map<String, dynamic>) {
                 return MaterialPageRoute(
-                  builder: (context) => CreditDetailScreen(creditId: args['id']),
+                  builder: (_) => SaleDetailScreen(saleId: args['id']),
                 );
               }
-              if (settings.name == '/expense-detail') {
-                final args = settings.arguments as Map<String, dynamic>;
+
+              if (settings.name == '/prescription-detail' && args is Map<String, dynamic>) {
                 return MaterialPageRoute(
-                  builder: (context) => ExpenseDetailScreen(expenseId: args['id']),
+                  builder: (_) => PrescriptionDetailScreen(prescriptionId: args['id']),
                 );
               }
-              if (settings.name == '/stock-take-detail') {
-                final args = settings.arguments as Map<String, dynamic>;
+
+              if (settings.name == '/credit-detail' && args is Map<String, dynamic>) {
                 return MaterialPageRoute(
-                  builder: (context) => StockTakeDetailScreen(stockTakeId: args['id']),
+                  builder: (_) => CreditDetailScreen(creditId: args['id'] as int),
                 );
               }
-              if (settings.name == '/otp-verification') {
-                final email = settings.arguments as String;
+
+              if (settings.name == '/expense-detail' && args is Map<String, dynamic>) {
                 return MaterialPageRoute(
-                  builder: (context) => OtpVerificationScreen(email: email),
+                  builder: (_) => ExpenseDetailScreen(expenseId: args['id'] as int),
                 );
               }
-              if (settings.name == '/reset-password') {
-                final args = settings.arguments as Map<String, String>;
+
+              if (settings.name == '/stock-take-detail' && args is Map<String, dynamic>) {
                 return MaterialPageRoute(
-                  builder: (context) => ResetPasswordScreen(
+                  builder: (_) => StockTakeDetailScreen(stockTakeId: args['id'] as int),
+                );
+              }
+
+              if (settings.name == '/otp-verification' && args is String) {
+                return MaterialPageRoute(
+                  builder: (_) => OtpVerificationScreen(email: args),
+                );
+              }
+
+              if (settings.name == '/reset-password' && args is Map<String, String>) {
+                return MaterialPageRoute(
+                  builder: (_) => ResetPasswordScreen(
                     email: args['email'] ?? '',
                     otp: args['otp'],
                     uid: args['uid'],
@@ -204,24 +212,85 @@ class MyApp extends StatelessWidget {
                   ),
                 );
               }
-              return null;
+
+              final routes = {
+                '/onboarding': (_) => const OnboardingScreen(),
+                '/login': (_) => const LoginScreen(),
+                '/register': (_) => const RegisterScreen(),
+                '/forgot-password': (_) => const ForgotPasswordScreen(),
+                '/medicines': (_) => const MedicineListScreen(),
+                '/add-medicine': (_) => const AddMedicineScreen(),
+                '/sales': (_) => const SaleListScreen(),
+                '/new-sale': (_) => const NewSaleScreen(),
+                '/reports': (_) => const ReportDashboard(),
+                '/sales-report': (_) => const SalesReportScreen(),
+                '/inventory-report': (_) => const InventoryReportScreen(),
+                '/staff-report': (_) => const StaffReportScreen(),
+                '/profile': (_) => const ProfileScreen(),
+                '/settings': (_) => const SettingsScreen(),
+                '/change-password': (_) => const ChangePasswordScreen(),
+                '/about': (_) => const AboutScreen(),
+                '/prescriptions': (_) => const PrescriptionListScreen(),
+                '/create-prescription': (_) => const old.CreatePrescriptionScreen(),
+                '/new-prescription': (_) => const newRx.NewPrescriptionScreen(),
+                '/upload-prescription': (_) => const UploadPrescriptionScreen(),
+                '/credits': (_) => const CreditListScreen(),
+                '/create-credit': (_) => const CreateCreditScreen(),
+                '/expenses': (_) => const ExpenseListScreen(),
+                '/create-expense': (_) => const CreateExpenseScreen(),
+                '/stock-takes': (_) => const StockTakeListScreen(),
+                '/create-stock-take': (_) => const CreateStockTakeScreen(),
+                '/staff': (_) => const StaffListScreen(),
+                '/create-staff': (_) => const CreateStaffScreen(),
+                '/staff-form': (_) => const StaffFormScreen(),
+              };
+
+              if (routes.containsKey(settings.name)) {
+                return MaterialPageRoute(builder: routes[settings.name]!);
+              }
+
+              return MaterialPageRoute(
+                builder: (_) => const Scaffold(
+                  body: Center(child: Text('Route not found')),
+                ),
+              );
             },
           );
         },
       ),
     );
   }
+}
 
-  String _getInitialRoute(AuthProvider authProvider, bool onboardingCompleted) {
-    if (authProvider.isLoading) {
-      return '/splash';
-    }
-    if (authProvider.isAuthenticated) {
-      return '/dashboard';
-    }
-    if (!onboardingCompleted) {
-      return '/onboarding';
-    }
-    return '/login';
+class ErrorApp extends StatelessWidget {
+  const ErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'His Grace Drugshop',
+      home: Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text('Failed to initialize app', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Please restart the application'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  main();
+                },
+                child: const Text('Restart'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -1,5 +1,7 @@
+// lib/services/auth_service.dart
+
 import '../models/user.dart';
-import '../models/auth_response.dart';  // Make sure this file exists
+import '../models/auth_response.dart';
 import 'api_service.dart';
 import 'storage_service.dart';
 
@@ -9,133 +11,192 @@ class AuthService {
 
   AuthService(this._apiService, this._storageService);
 
+  // ================= LOGIN =================
   Future<AuthResponse> login(String username, String password) async {
     try {
       final response = await _apiService.login(username, password);
-      
-      if (response.statusCode == 200) {
-        final data = response.data;
-        final token = data['token'];
-        final userData = data['user'];
-        
-        await _storageService.saveToken(token);
-        await _storageService.saveUser(userData);
-        
-        return AuthResponse(
-          token: token,
-          user: User.fromJson(userData),
-        );
+
+      if (!response.isSuccess) {
+        return AuthResponse(error: response.error ?? 'Login failed');
       }
-      return AuthResponse(error: 'Invalid credentials');
+
+      final data = response.data;
+
+      if (data == null) {
+        return AuthResponse(error: 'Invalid server response');
+      }
+
+      final token = data['token'] ?? data['access'] ?? data['key'];
+
+      if (token == null || token.toString().isEmpty) {
+        return AuthResponse(error: 'Authentication token not provided');
+      }
+
+      final userJson = data['user'] ?? data;
+
+      if (userJson == null || userJson is! Map<String, dynamic>) {
+        return AuthResponse(error: 'Invalid user data');
+      }
+
+      final user = User.fromJson(userJson);
+
+      await _storageService.saveToken(token.toString());
+      await _storageService.saveUser(user.toJson());
+
+      return AuthResponse(
+        user: user,
+        token: token.toString(),
+      );
     } catch (e) {
       return AuthResponse(error: 'Connection error. Please try again.');
     }
   }
 
-  Future<bool> logout() async {
+  // ================= LOGOUT =================
+  Future<void> logout() async {
     try {
       await _apiService.logout();
-      await _storageService.clearAll();
-      return true;
-    } catch (e) {
-      await _storageService.clearAll();
-      return false;
-    }
+    } catch (_) {}
+    await _storageService.clearAll();
   }
 
+  // ================= REGISTER =================
   Future<AuthResponse> register(Map<String, dynamic> userData) async {
     try {
       final response = await _apiService.register(userData);
-      
-      if (response.statusCode == 201) {
-        final data = response.data;
-        return AuthResponse(
-          message: data['message'],
-          otp: data['otp']?.toString(),
-        );
-      } else if (response.statusCode == 400) {
-        final errors = response.data;
-        String errorMessage = '';
-        errors.forEach((key, value) {
-          errorMessage += '$key: ${value.join(', ')}\n';
-        });
-        return AuthResponse(error: errorMessage);
+
+      if (response.isSuccess) {
+        return AuthResponse(message: 'Registration successful');
       }
-      return AuthResponse(error: 'Registration failed');
+
+      return AuthResponse(
+        error: response.error ?? 'Registration failed',
+      );
     } catch (e) {
       return AuthResponse(error: 'Connection error. Please try again.');
     }
   }
 
+  // ================= OTP =================
   Future<AuthResponse> verifyOtp(String email, String otp) async {
     try {
       final response = await _apiService.verifyOtp(email, otp);
-      
-      if (response.statusCode == 200) {
-        return AuthResponse(message: response.data['message']);
+
+      if (response.isSuccess) {
+        return AuthResponse(message: 'OTP verified successfully');
       }
-      return AuthResponse(error: 'Invalid OTP');
-    } catch (e) {
-      return AuthResponse(error: 'Verification failed');
-    }
-  }
 
-  Future<AuthResponse> forgotPassword(String email) async {
-    try {
-      final response = await _apiService.forgotPassword(email);
-      
-      if (response.statusCode == 200) {
-        final data = response.data;
-        return AuthResponse(
-          message: data['message'],
-          otp: data['otp']?.toString(),
-          uid: data['uid'],
-          resetToken: data['token'],
-        );
-      }
-      return AuthResponse(error: response.data['error'] ?? 'Failed to send reset email');
+      return AuthResponse(error: response.error ?? 'Invalid OTP');
     } catch (e) {
-      return AuthResponse(error: 'Connection error. Please try again.');
-    }
-  }
-
-  Future<bool> resetPassword(String uid, String token, String newPassword) async {
-    try {
-      final response = await _apiService.resetPassword(uid, token, newPassword);
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<bool> resetPasswordWithOtp(String email, String otp, String newPassword) async {
-    try {
-      final response = await _apiService.resetPasswordWithOtp(email, otp, newPassword);
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
+      return AuthResponse(error: 'Verification failed. Try again.');
     }
   }
 
   Future<bool> resendOtp(String email) async {
     try {
       final response = await _apiService.resendOtp(email);
-      return response.statusCode == 200;
-    } catch (e) {
+      return response.isSuccess;
+    } catch (_) {
       return false;
     }
   }
 
-  Future<User?> getCurrentUser() async {
-    final userData = await _storageService.getUser();
-    if (userData != null) {
-      return User.fromJson(userData);
+  // ================= PASSWORD =================
+  Future<AuthResponse> forgotPassword(String email) async {
+    try {
+      final response = await _apiService.forgotPassword(email);
+
+      if (response.isSuccess) {
+        return AuthResponse(message: 'Password reset email sent');
+      }
+
+      return AuthResponse(
+        error: response.error ?? 'Failed to send reset email',
+      );
+    } catch (e) {
+      return AuthResponse(error: 'Connection error. Try again.');
     }
-    return null;
+  }
+
+  Future<bool> resetPassword(String uid, String token, String password) async {
+    try {
+      final response = await _apiService.resetPassword(uid, token, password);
+      return response.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> resetPasswordWithOtp(String email, String otp, String password) async {
+    try {
+      final response = await _apiService.resetPasswordWithOtp(email, otp, password);
+      return response.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ================= USERS (STAFF) =================
+  Future<List<User>> getUsers() async {
+    try {
+      final res = await _apiService.getUsers();
+
+      if (res.isSuccess && res.data is List) {
+        return (res.data as List)
+            .map((e) => User.fromJson(e))
+            .toList();
+      }
+
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<bool> createUser(Map<String, dynamic> data) async {
+    try {
+      final res = await _apiService.createUser(data);
+      return res.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> updateUser(int userId, Map<String, dynamic> data) async {
+    try {
+      final res = await _apiService.updateUser(userId, data);
+      return res.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteUser(int userId) async {
+    try {
+      final res = await _apiService.deleteUser(userId);
+      return res.isSuccess;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ================= LOCAL =================
+  Future<User?> getCurrentUser() async {
+    try {
+      final data = await _storageService.getUser();
+      if (data == null) return null;
+      return User.fromJson(data);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<bool> isAuthenticated() async {
-    final token = await _storageService.getToken();
-    return token != null;
+    try {
+      final token = await _storageService.getToken();
+      return token != null && token.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 }

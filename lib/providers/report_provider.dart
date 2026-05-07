@@ -1,209 +1,230 @@
+// lib/providers/report_provider.dart
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
 class ReportProvider extends ChangeNotifier {
   final ApiService _apiService;
-  
-  Map<String, dynamic>? _dashboardSummary;
-  Map<String, dynamic>? _salesReport;
-  Map<String, dynamic>? _inventoryReport;
-  Map<String, dynamic>? _staffReport;
-  List<dynamic> _dailySalesReport = [];
-  List<dynamic> _lowStockReport = [];
-  List<dynamic> _expiredReport = [];
-  
+
+  Map<String, dynamic> _dashboardSummary = {};
+  Map<String, dynamic> _inventoryReport = {};
+  Map<String, dynamic> _staffReport = {};
+  Map<String, dynamic> _dailySalesReport = {};
+  Map<String, dynamic> _salesReport = {};      // ← new
+  Map<String, dynamic> _lowStockReport = {};
+  Map<String, dynamic> _expiredReport = {};
   bool _isLoading = false;
   String? _error;
 
   ReportProvider(this._apiService);
 
-  // Getters
-  Map<String, dynamic>? get dashboardSummary => _dashboardSummary;
-  Map<String, dynamic>? get salesReport => _salesReport;
-  Map<String, dynamic>? get inventoryReport => _inventoryReport;
-  Map<String, dynamic>? get staffReport => _staffReport;
-  List<dynamic> get dailySalesReport => _dailySalesReport;
-  List<dynamic> get lowStockReport => _lowStockReport;
-  List<dynamic> get expiredReport => _expiredReport;
+  Map<String, dynamic> get dashboardSummary => _dashboardSummary;
+  Map<String, dynamic> get inventoryReport => _inventoryReport;
+  Map<String, dynamic> get staffReport => _staffReport;
+  Map<String, dynamic> get dailySalesReport => _dailySalesReport;
+  Map<String, dynamic> get salesReport => _salesReport;          // ← new
+  Map<String, dynamic> get lowStockReport => _lowStockReport;
+  Map<String, dynamic> get expiredReport => _expiredReport;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Load dashboard summary
+  // ── Dashboard summary ─────────────────────────────────────────────────────
+
   Future<void> loadDashboardSummary() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getDashboardSummary();
-      _dashboardSummary = _parseResponseData(response.data);
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load dashboard summary: $e';
-      print('Error loading dashboard: $e');
-    }
+      final response = await _apiService.getDashboard();
 
-    _isLoading = false;
-    notifyListeners();
+      if (response.isSuccess && response.data != null) {
+        _dashboardSummary = response.data;
+      } else {
+        _error = response.error ?? 'Failed to load dashboard summary';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  // Load sales report
-  Future<void> loadSalesReport({String? startDate, String? endDate}) async {
+  // ── Sales report ──────────────────────────────────────────────────────────
+
+  /// Loads a sales report filtered by [startDate] / [endDate] (yyyy-MM-dd).
+  /// Results are stored in [salesReport].
+  Future<void> loadSalesReport({
+    String? startDate,
+    String? endDate,
+    String? groupBy, // 'day' | 'week' | 'month'
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getSalesReport(
-        startDate: startDate,
-        endDate: endDate,
-      );
-      _salesReport = _parseResponseData(response.data);
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load sales report: $e';
-      print('Error loading sales report: $e');
-    }
+      // Build query string from optional params.
+      final params = <String>[];
+      if (startDate != null) params.add('start_date=$startDate');
+      if (endDate != null) params.add('end_date=$endDate');
+      if (groupBy != null) params.add('group_by=$groupBy');
+      final query = params.isNotEmpty ? '?${params.join('&')}' : '';
 
-    _isLoading = false;
-    notifyListeners();
+      final response = await _apiService.get("/sales/report/$query");
+
+      if (response.isSuccess && response.data != null) {
+        _salesReport = response.data is Map<String, dynamic>
+            ? response.data
+            : {'results': response.data};
+      } else {
+        // Fallback: try the daily-sales endpoint so the screen still renders.
+        final fallback = await _apiService.get("/sales/daily/$query");
+        if (fallback.isSuccess && fallback.data != null) {
+          _salesReport = fallback.data is Map<String, dynamic>
+              ? fallback.data
+              : {'results': fallback.data};
+        } else {
+          _error = response.error ?? 'Failed to load sales report';
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  // Load inventory report
+  // ── Daily sales (kept for backward-compat) ────────────────────────────────
+
+  Future<void> loadDailySalesReport() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.get("/sales/daily/");
+
+      if (response.isSuccess && response.data != null) {
+        _dailySalesReport = response.data;
+      } else {
+        _error = response.error ?? 'Failed to load daily sales report';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ── Inventory ─────────────────────────────────────────────────────────────
+
   Future<void> loadInventoryReport() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getInventoryReport();
-      _inventoryReport = _parseResponseData(response.data);
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load inventory report: $e';
-      print('Error loading inventory report: $e');
-    }
+      final response = await _apiService.getMedicines();
 
-    _isLoading = false;
-    notifyListeners();
+      if (response.isSuccess && response.data != null) {
+        _inventoryReport = {
+          'medicines': response.data['results'] ?? response.data,
+          'total':
+              response.data['count'] ?? (response.data as List).length,
+        };
+      } else {
+        _error = response.error ?? 'Failed to load inventory report';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  // Load staff report
+  // ── Staff ─────────────────────────────────────────────────────────────────
+
   Future<void> loadStaffReport() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final response = await _apiService.getStaffReport();
-      _staffReport = _parseResponseData(response.data);
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load staff report: $e';
-      print('Error loading staff report: $e');
-    }
+      final response = await _apiService.get("/auth/users/");
 
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  // Load daily sales report
-  Future<void> loadDailySalesReport() async {
-    try {
-      final response = await _apiService.getDailySalesReport();
-      final data = response.data;
-      
-      if (data is Map && data['sales'] != null) {
-        _dailySalesReport = data['sales'] is List ? data['sales'] : [];
-      } else if (data is List) {
-        _dailySalesReport = data;
+      if (response.isSuccess && response.data != null) {
+        _staffReport = {
+          'users': response.data['results'] ?? response.data,
+          'total':
+              response.data['count'] ?? (response.data as List).length,
+        };
       } else {
-        _dailySalesReport = [];
+        _error = response.error ?? 'Failed to load staff report';
       }
-      
-      notifyListeners();
     } catch (e) {
-      print('Error loading daily sales report: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  // Load low stock report
+  // ── Low stock ─────────────────────────────────────────────────────────────
+
   Future<void> loadLowStockReport() async {
-    try {
-      final response = await _apiService.getLowStockReport();
-      final data = response.data;
-      
-      if (data is Map && data['medicines'] != null) {
-        _lowStockReport = data['medicines'] is List ? data['medicines'] : [];
-      } else if (data is List) {
-        _lowStockReport = data;
-      } else {
-        _lowStockReport = [];
-      }
-      
-      notifyListeners();
-    } catch (e) {
-      print('Error loading low stock report: $e');
-    }
-  }
-
-  // Load expired report
-  Future<void> loadExpiredReport() async {
-    try {
-      final response = await _apiService.getExpiredReport();
-      final data = response.data;
-      
-      if (data is Map && data['medicines'] != null) {
-        _expiredReport = data['medicines'] is List ? data['medicines'] : [];
-      } else if (data is List) {
-        _expiredReport = data;
-      } else {
-        _expiredReport = [];
-      }
-      
-      notifyListeners();
-    } catch (e) {
-      print('Error loading expired report: $e');
-    }
-  }
-
-  // Helper method to safely parse response data
-  Map<String, dynamic>? _parseResponseData(dynamic data) {
-    if (data is Map) {
-      // Convert any string numbers to appropriate types
-      final Map<String, dynamic> parsedData = {};
-      data.forEach((key, value) {
-        if (value is String) {
-          // Try to parse numbers
-          if (value.contains('.') && double.tryParse(value) != null) {
-            parsedData[key] = double.parse(value);
-          } else if (int.tryParse(value) != null) {
-            parsedData[key] = int.parse(value);
-          } else {
-            parsedData[key] = value;
-          }
-        } else {
-          parsedData[key] = value;
-        }
-      });
-      return parsedData;
-    }
-    return null;
-  }
-
-  // Clear error
-  void clearError() {
+    _isLoading = true;
     _error = null;
     notifyListeners();
+
+    try {
+      final response = await _apiService.get("/medicines/?low_stock=true");
+
+      if (response.isSuccess && response.data != null) {
+        _lowStockReport = {
+          'medicines': response.data['results'] ?? response.data,
+          'count':
+              response.data['count'] ?? (response.data as List).length,
+        };
+      } else {
+        _error = response.error ?? 'Failed to load low stock report';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  // Refresh all reports
-  Future<void> refreshAllReports() async {
-    await Future.wait([
-      loadDashboardSummary(),
-      loadDailySalesReport(),
-      loadLowStockReport(),
-      loadExpiredReport(),
-    ]);
+  // ── Expired ───────────────────────────────────────────────────────────────
+
+  Future<void> loadExpiredReport() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.get("/medicines/?expired=true");
+
+      if (response.isSuccess && response.data != null) {
+        _expiredReport = {
+          'medicines': response.data['results'] ?? response.data,
+          'count':
+              response.data['count'] ?? (response.data as List).length,
+        };
+      } else {
+        _error = response.error ?? 'Failed to load expired report';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

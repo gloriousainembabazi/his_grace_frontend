@@ -275,10 +275,21 @@ class StorageKeys {
 }
 
 class AppConstants {
-  // API Base URL
-  static const String baseUrl = 'http://localhost:8000/api';
+  // ==================== API BASE URL ====================
+  // For Web development (Flutter run -d web-server)
+  static const String baseUrl = 'http://127.0.0.1:8000/api';
   
-  // API Endpoints
+  // For Android Emulator (use this for Android testing)
+  // static const String baseUrl = 'http://10.0.2.2:8000/api';
+  
+  // For iOS Simulator
+  // static const String baseUrl = 'http://localhost:8000/api';
+  
+  // For Physical Device (replace with your computer's IP)
+  // static const String baseUrl = 'http://192.168.1.100:8000/api';
+  
+  // ==================== API ENDPOINTS ====================
+  // Auth Endpoints
   static const String loginEndpoint = '/auth/login/';
   static const String logoutEndpoint = '/auth/logout/';
   static const String registerEndpoint = '/auth/register/';
@@ -293,19 +304,19 @@ class AppConstants {
   static const String medicinesEndpoint = '/medicines/';
   static const String categoriesEndpoint = '/medicines/categories/';
   static const String suppliersEndpoint = '/medicines/suppliers/';
-  static const String lowStockEndpoint = '/medicines/low-stock/';
+  static const String lowStockEndpoint = '/medicines/low_stock/';
   static const String expiringEndpoint = '/medicines/expiring/';
   static const String expiredEndpoint = '/medicines/expired/';
   
   // Sale Endpoints
   static const String salesEndpoint = '/sales/';
   static const String dailySalesEndpoint = '/sales/daily/';
-  static const String salesByDateEndpoint = '/sales/by-date/';
+  static const String salesByDateEndpoint = '/sales/by_date/';
   
   // Prescription Endpoints
   static const String prescriptionsEndpoint = '/prescriptions/';
   static const String dispensePrescriptionEndpoint = '/prescriptions/';
-  static const String prescriptionsByDateEndpoint = '/prescriptions/by-date/';
+  static const String prescriptionsByDateEndpoint = '/prescriptions/by_date/';
   
   // Credit Endpoints
   static const String creditsEndpoint = '/credits/';
@@ -314,8 +325,8 @@ class AppConstants {
   
   // Expense Endpoints
   static const String expensesEndpoint = '/expenses/';
-  static const String expensesByCategoryEndpoint = '/expenses/by-category/';
-  static const String expensesByDateEndpoint = '/expenses/by-date/';
+  static const String expensesByCategoryEndpoint = '/expenses/by_category/';
+  static const String expensesByDateEndpoint = '/expenses/by_date/';
   
   // Stock Take Endpoints
   static const String stockTakesEndpoint = '/stock-takes/';
@@ -328,8 +339,8 @@ class AppConstants {
   static const String salesReportEndpoint = '/reports/sales/';
   static const String inventoryReportEndpoint = '/reports/inventory/';
   static const String staffReportEndpoint = '/reports/staff/';
-  static const String dailySalesReportEndpoint = '/reports/daily-sales/';
-  static const String lowStockReportEndpoint = '/reports/low-stock/';
+  static const String dailySalesReportEndpoint = '/reports/daily_sales/';
+  static const String lowStockReportEndpoint = '/reports/low_stock/';
   static const String expiredReportEndpoint = '/reports/expired/';
   static const String financialSummaryEndpoint = '/reports/financial-summary/';
   static const String profitLossEndpoint = '/reports/profit-loss/';
@@ -414,12 +425,21 @@ class AppConstants {
   
   // Payment Methods
   static const List<String> paymentMethods = [
-    'Cash',
-    'Bank Transfer',
-    'Cheque',
-    'Mobile Money',
-    'Card',
+    'cash',
+    'bank',
+    'cheque',
+    'mobile',
+    'card',
   ];
+  
+  // Payment Method Display Names
+  static const Map<String, String> paymentMethodDisplayNames = {
+    'cash': 'Cash',
+    'bank': 'Bank Transfer',
+    'cheque': 'Cheque',
+    'mobile': 'Mobile Money',
+    'card': 'Card',
+  };
   
   // Prescription Statuses
   static const List<String> prescriptionStatuses = [
@@ -458,12 +478,21 @@ class AppConstants {
   
   // User Roles
   static const List<String> userRoles = [
-    'Admin',
-    'Pharmacist',
-    'Cashier',
-    'Manager',
-    'Accountant',
+    'admin',
+    'pharmacist',
+    'cashier',
+    'manager',
+    'accountant',
   ];
+  
+  // User Role Display Names
+  static const Map<String, String> userRoleDisplayNames = {
+    'admin': 'Admin',
+    'pharmacist': 'Pharmacist',
+    'cashier': 'Cashier',
+    'manager': 'Manager',
+    'accountant': 'Accountant',
+  };
 }
 
 // Helper extension methods

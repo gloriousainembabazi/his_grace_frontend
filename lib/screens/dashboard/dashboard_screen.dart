@@ -1,720 +1,609 @@
+// lib/screens/dashboard/dashboard_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart' as fl;
 import '../../providers/auth_provider.dart';
 import '../../providers/medicine_provider.dart';
 import '../../providers/sale_provider.dart';
 import '../../providers/prescription_provider.dart';
-import '../../providers/credit_provider.dart';
 import '../../providers/expense_provider.dart';
+import '../../providers/credit_provider.dart';
 import '../../providers/stock_provider.dart';
-import '../../models/sale.dart';
-import '../../widgets/sales_chart.dart';
+import '../../providers/dashboard_provider.dart';
+import '../../models/prescription_model.dart';
 import '../../utils/constants.dart';
+import '../prescription/prescription_list_screen.dart';
+import '../reports/report_dashboard.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  _DashboardScreenState createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
+  String _userName = 'Glorious';
 
   final List<Widget> _screens = [
     const DashboardHome(),
-    const Center(child: Text('Medicines Screen - Use navigation')),
-    const Center(child: Text('Sales Screen - Use navigation')),
-    const Center(child: Text('Prescriptions Screen - Use navigation')),
-    const Center(child: Text('Credits Screen - Use navigation')),
-    const Center(child: Text('Expenses Screen - Use navigation')),
-    const Center(child: Text('Stock Take Screen - Use navigation')),
-    const Center(child: Text('Reports Screen - Use navigation')),
+    const PrescriptionListScreen(),
+    const MedicineListScreen(),
+    const ReportDashboard(),
   ];
 
   final List<String> _titles = [
     'Dashboard',
-    'Medicines',
-    'Sales',
     'Prescriptions',
-    'Credits',
-    'Expenses',
-    'Stock Take',
+    'Medicines',
     'Reports',
   ];
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    _loadUserData();
+    _loadDashboardData();
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _loadUserData() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    if (user != null && user.fullName.isNotEmpty) {
+      setState(() {
+        _userName = user.fullName.split(' ')[0];
+      });
+    }
+  }
+
+  Future<void> _loadDashboardData() async {
+    final dashboardProvider = Provider.of<DashboardProvider>(context, listen: false);
     final medicineProvider = Provider.of<MedicineProvider>(context, listen: false);
     final saleProvider = Provider.of<SaleProvider>(context, listen: false);
     final prescriptionProvider = Provider.of<PrescriptionProvider>(context, listen: false);
-    final creditProvider = Provider.of<CreditProvider>(context, listen: false);
     final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
+    final creditProvider = Provider.of<CreditProvider>(context, listen: false);
     final stockProvider = Provider.of<StockProvider>(context, listen: false);
-    
+
     await Future.wait([
+      dashboardProvider.loadDashboard(),
+      medicineProvider.loadMedicines(),
       medicineProvider.loadLowStockMedicines(),
       medicineProvider.loadExpiringMedicines(),
       saleProvider.loadDailySales(),
       saleProvider.loadSales(),
       prescriptionProvider.loadPrescriptions(),
-      creditProvider.loadCredits(),
       expenseProvider.loadExpenses(),
+      creditProvider.loadCredits(),
       stockProvider.loadStockTakes(),
     ]);
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final isAdmin = authProvider.currentUser?.isAdmin ?? false;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_selectedIndex]),
-        actions: [
-          if (_selectedIndex == 0)
-            Stack(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined),
-                  onPressed: () {
-                    _showNotifications(context);
-                  },
-                ),
-                Consumer4<MedicineProvider, PrescriptionProvider, CreditProvider, StockProvider>(
-                  builder: (context, medicineProvider, prescriptionProvider, creditProvider, stockProvider, child) {
-                    final totalAlerts = medicineProvider.lowStockMedicines.length + 
-                                       medicineProvider.expiringMedicines.length +
-                                       prescriptionProvider.prescriptions.where((p) => p.status == 'pending').length +
-                                       creditProvider.credits.where((c) => c.status == 'overdue').length;
-                    
-                    if (totalAlerts > 0) {
-                      return Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            '$totalAlerts',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-              ],
-            ),
-          
-          if (_selectedIndex == 2)
-            IconButton(
-              icon: const Icon(Icons.add_shopping_cart),
-              onPressed: () {
-                Navigator.pushNamed(context, '/new-sale');
-              },
-            ),
-          
-          if (_selectedIndex == 3)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.pushNamed(context, '/create-prescription');
-              },
-            ),
-          
-          if (_selectedIndex == 4)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.pushNamed(context, '/create-credit');
-              },
-            ),
-          
-          if (_selectedIndex == 5)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.pushNamed(context, '/create-expense');
-              },
-            ),
-          
-          if (_selectedIndex == 6)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                Navigator.pushNamed(context, '/create-stock-take');
-              },
-            ),
-          
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'profile') {
-                Navigator.pushNamed(context, '/profile');
-              } else if (value == 'settings') {
-                Navigator.pushNamed(context, '/settings');
-              } else if (value == 'logout') {
-                _showLogoutDialog();
-              } else if (value == 'staff' && isAdmin) {
-                Navigator.pushNamed(context, '/staff');
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'profile',
-                child: Row(
-                  children: [
-                    Icon(Icons.person_outline, size: 20),
-                    SizedBox(width: 8),
-                    Text('Profile'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings_outlined, size: 20),
-                    SizedBox(width: 8),
-                    Text('Settings'),
-                  ],
-                ),
-              ),
-              if (isAdmin)
-                const PopupMenuItem(
-                  value: 'staff',
-                  child: Row(
-                    children: [
-                      Icon(Icons.people_outline, size: 20),
-                      SizedBox(width: 8),
-                      Text('Staff Management'),
-                    ],
-                  ),
-                ),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 20, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Logout', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
       body: _screens[_selectedIndex],
-      
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppConstants.primaryColor,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          switch(index) {
-            case 0:
-              setState(() {
-                _selectedIndex = index;
-              });
-              break;
-            case 1:
-              Navigator.pushNamed(context, '/medicines').then((_) {
-                setState(() {
-                  _selectedIndex = 1;
-                });
-              });
-              break;
-            case 2:
-              Navigator.pushNamed(context, '/sales').then((_) {
-                setState(() {
-                  _selectedIndex = 2;
-                });
-              });
-              break;
-            case 3:
-              Navigator.pushNamed(context, '/prescriptions').then((_) {
-                setState(() {
-                  _selectedIndex = 3;
-                });
-              });
-              break;
-            case 4:
-              Navigator.pushNamed(context, '/credits').then((_) {
-                setState(() {
-                  _selectedIndex = 4;
-                });
-              });
-              break;
-            case 5:
-              Navigator.pushNamed(context, '/expenses').then((_) {
-                setState(() {
-                  _selectedIndex = 5;
-                });
-              });
-              break;
-            case 6:
-              Navigator.pushNamed(context, '/stock-takes').then((_) {
-                setState(() {
-                  _selectedIndex = 6;
-                });
-              });
-              break;
-            case 7:
-              Navigator.pushNamed(context, '/reports').then((_) {
-                setState(() {
-                  _selectedIndex = 7;
-                });
-              });
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.medical_services_outlined),
-            activeIcon: Icon(Icons.medical_services),
-            label: 'Medicines',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart_outlined),
-            activeIcon: Icon(Icons.shopping_cart),
-            label: 'Sales',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.medical_information_outlined),
-            activeIcon: Icon(Icons.medical_information),
-            label: 'Prescriptions',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.credit_card_outlined),
-            activeIcon: Icon(Icons.credit_card),
-            label: 'Credits',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.money_off_outlined),
-            activeIcon: Icon(Icons.money_off),
-            label: 'Expenses',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inventory_outlined),
-            activeIcon: Icon(Icons.inventory),
-            label: 'Stock Take',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assessment_outlined),
-            activeIcon: Icon(Icons.assessment),
-            label: 'Reports',
-          ),
-        ],
-      ),
-      
-      floatingActionButton: _selectedIndex == 1
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/add-medicine');
-              },
-              backgroundColor: AppConstants.primaryColor,
-              child: const Icon(Icons.add),
-            )
-          : null,
-    );
-  }
-
-  Future<void> _showLogoutDialog() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
             ),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.logout();
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login');
-      }
-    }
-  }
-
-  void _showNotifications(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return MultiProvider(
-          providers: [
-            ChangeNotifierProvider.value(value: Provider.of<MedicineProvider>(context, listen: false)),
-            ChangeNotifierProvider.value(value: Provider.of<PrescriptionProvider>(context, listen: false)),
-            ChangeNotifierProvider.value(value: Provider.of<CreditProvider>(context, listen: false)),
           ],
-          child: Consumer3<MedicineProvider, PrescriptionProvider, CreditProvider>(
-            builder: (context, medicineProvider, prescriptionProvider, creditProvider, child) {
-              final pendingPrescriptions = prescriptionProvider.prescriptions.where((p) => p.status == 'pending').length;
-              final overdueCredits = creditProvider.credits.where((c) => c.status == 'overdue').length;
-              
-              return Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Notifications',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (medicineProvider.lowStockMedicines.isEmpty &&
-                        medicineProvider.expiringMedicines.isEmpty &&
-                        pendingPrescriptions == 0 &&
-                        overdueCredits == 0)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Text('No notifications'),
-                        ),
-                      ),
-                    if (medicineProvider.lowStockMedicines.isNotEmpty) ...[
-                      Text(
-                        'Low Stock Alert',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.orange,
-                        ),
-                      ),
-                      ...medicineProvider.lowStockMedicines.take(3).map(
-                        (medicine) => ListTile(
-                          leading: const Icon(Icons.warning, color: Colors.orange),
-                          title: Text(medicine.name),
-                          subtitle: Text('Stock: ${medicine.quantity}'),
-                          dense: true,
-                        ),
-                      ),
-                      if (medicineProvider.lowStockMedicines.length > 3)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Text(
-                            '+${medicineProvider.lowStockMedicines.length - 3} more',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                    ],
-                    if (medicineProvider.expiringMedicines.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Expiring Soon',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.red,
-                        ),
-                      ),
-                      ...medicineProvider.expiringMedicines.take(3).map(
-                        (medicine) => ListTile(
-                          leading: const Icon(Icons.event, color: Colors.red),
-                          title: Text(medicine.name),
-                          subtitle: Text(
-                            'Expires: ${medicine.expiryDate.day}/${medicine.expiryDate.month}/${medicine.expiryDate.year}',
-                          ),
-                          dense: true,
-                        ),
-                      ),
-                      if (medicineProvider.expiringMedicines.length > 3)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Text(
-                            '+${medicineProvider.expiringMedicines.length - 3} more',
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                    ],
-                    if (pendingPrescriptions > 0) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Pending Prescriptions',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.medical_services, color: Colors.blue),
-                        title: const Text('Prescriptions waiting to be dispensed'),
-                        subtitle: Text('$pendingPrescriptions pending'),
-                        dense: true,
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, '/prescriptions');
-                        },
-                      ),
-                    ],
-                    if (overdueCredits > 0) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Overdue Credits',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w500,
-                          color: Colors.red,
-                        ),
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.warning, color: Colors.red),
-                        title: const Text('Credits past due date'),
-                        subtitle: Text('$overdueCredits overdue'),
-                        dense: true,
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, '/credits');
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: AppColors.primaryGreen,
+          unselectedItemColor: Colors.grey,
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.medical_information_outlined),
+              activeIcon: Icon(Icons.medical_information),
+              label: 'Prescriptions',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.medication_outlined),
+              activeIcon: Icon(Icons.medication),
+              label: 'Medicines',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.assessment_outlined),
+              activeIcon: Icon(Icons.assessment),
+              label: 'Reports',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-// Dashboard Home Widget
-class DashboardHome extends StatelessWidget {
+// Enhanced Dashboard Home Widget with Charts
+class DashboardHome extends StatefulWidget {
   const DashboardHome({super.key});
 
-  List<Map<String, dynamic>> _prepareHourlyChartData(List<Sale> sales) {
-    if (sales.isEmpty) {
-      return [
-        {'label': '8am', 'value': 0},
-        {'label': '10am', 'value': 0},
-        {'label': '12pm', 'value': 0},
-        {'label': '2pm', 'value': 0},
-        {'label': '4pm', 'value': 0},
-        {'label': '6pm', 'value': 0},
-      ];
-    }
-    
-    Map<int, double> hourlyTotals = {};
-    for (var sale in sales) {
-      final hour = sale.saleDate.hour;
-      hourlyTotals[hour] = (hourlyTotals[hour] ?? 0) + sale.totalPrice;
-    }
-    
-    final sortedHours = hourlyTotals.keys.toList()..sort();
-    
-    return sortedHours.map((hour) {
-      final period = hour < 12 ? '${hour}am' : hour == 12 ? '12pm' : '${hour - 12}pm';
-      return {
-        'label': period,
-        'value': hourlyTotals[hour]?.round() ?? 0,
-      };
-    }).toList();
+  @override
+  State<DashboardHome> createState() => _DashboardHomeState();
+}
+
+class _DashboardHomeState extends State<DashboardHome> {
+  String _selectedChartPeriod = 'weekly';
+  final Map<String, String> _periodOptions = {
+    'daily': 'Today',
+    'weekly': 'This Week',
+    'monthly': 'This Month',
+    'yearly': 'This Year',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadChartData();
+  }
+
+  Future<void> _loadChartData() async {
+    final dashboardProvider = Provider.of<DashboardProvider>(context, listen: false);
+    await dashboardProvider.fetchSalesChart(period: _selectedChartPeriod);
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.currentUser;
-
     return RefreshIndicator(
       onRefresh: () async {
         final medicineProvider = Provider.of<MedicineProvider>(context, listen: false);
         final saleProvider = Provider.of<SaleProvider>(context, listen: false);
         final prescriptionProvider = Provider.of<PrescriptionProvider>(context, listen: false);
-        final creditProvider = Provider.of<CreditProvider>(context, listen: false);
-        final expenseProvider = Provider.of<ExpenseProvider>(context, listen: false);
-        final stockProvider = Provider.of<StockProvider>(context, listen: false);
+        final dashboardProvider = Provider.of<DashboardProvider>(context, listen: false);
         
         await Future.wait([
+          medicineProvider.loadMedicines(),
           medicineProvider.loadLowStockMedicines(),
           medicineProvider.loadExpiringMedicines(),
           saleProvider.loadDailySales(),
-          saleProvider.loadSales(refresh: true),
+          saleProvider.loadSales(),
           prescriptionProvider.loadPrescriptions(),
-          creditProvider.loadCredits(),
-          expenseProvider.loadExpenses(),
-          stockProvider.loadStockTakes(),
+          dashboardProvider.loadDashboard(),
+          dashboardProvider.fetchSalesChart(period: _selectedChartPeriod),
         ]);
       },
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome Message
+            _buildHeader(),
+            const SizedBox(height: 16),
+            _buildStatsCards(),
+            const SizedBox(height: 20),
+            _buildQuickActionsSection(),
+            const SizedBox(height: 24),
+            Consumer<DashboardProvider>(
+              builder: (context, dashboardProvider, child) {
+                return _buildSalesChartSection(dashboardProvider);
+              },
+            ),
+            const SizedBox(height: 24),
+            Consumer<PrescriptionProvider>(
+              builder: (context, provider, child) {
+                return _buildPendingPrescriptionsSection(provider);
+              },
+            ),
+            const SizedBox(height: 24),
+            Consumer<MedicineProvider>(
+              builder: (context, provider, child) {
+                return _buildInventoryAlertsSection(provider);
+              },
+            ),
+            const SizedBox(height: 24),
+            Consumer<CreditProvider>(
+              builder: (context, creditProvider, child) {
+                return _buildPaymentStatusSection(creditProvider);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final userName = authProvider.currentUser?.fullName.split(' ').first ?? 'Glorious';
+    final timeOfDay = _getTimeOfDay();
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 48, 20, 30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Good $timeOfDay,',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      userName,
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: AppColors.primaryGreen,
+                    child: const Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildPerformanceIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPerformanceIndicator() {
+    return Consumer<SaleProvider>(
+      builder: (context, saleProvider, child) {
+        final todayRevenue = saleProvider.todayRevenue;
+        final yesterdayRevenue = saleProvider.yesterdayRevenue;
+        final growthRate = yesterdayRevenue > 0 
+            ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100)
+            : 0.0;
+        
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                growthRate >= 0 ? Icons.trending_up : Icons.trending_down,
+                color: Colors.white,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${growthRate >= 0 ? '+' : ''}${growthRate.toStringAsFixed(1)}% vs yesterday',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsCards() {
+    return Consumer4<SaleProvider, MedicineProvider, CreditProvider, ExpenseProvider>(
+      builder: (context, saleProvider, medicineProvider, creditProvider, expenseProvider, child) {
+        final todayRevenue = saleProvider.todayRevenue;
+        final totalProducts = medicineProvider.medicines.length;
+        final expiringCount = medicineProvider.expiringMedicines.length;
+        final pendingCredits = creditProvider.credits.where((c) => c.status == 'pending').length;
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildStatsCard(
+                  'Today\'s Sales',
+                  _formatCurrency(todayRevenue),
+                  Icons.trending_up,
+                  Colors.green,
+                  () {},
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatsCard(
+                  'Total Products',
+                  totalProducts.toString(),
+                  Icons.inventory,
+                  Colors.blue,
+                  () {},
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatsCard(
+                  'Expiring Soon',
+                  expiringCount.toString(),
+                  Icons.event,
+                  Colors.orange,
+                  () {},
+                  valueColor: expiringCount > 10 ? Colors.red : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatsCard(
+                  'Pending Credits',
+                  pendingCredits.toString(),
+                  Icons.credit_card,
+                  Colors.purple,
+                  () {},
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatsCard(String title, String value, IconData icon, Color color, VoidCallback onTap,
+      {Color? valueColor}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 8),
             Text(
-              'Welcome back,',
+              value,
               style: GoogleFonts.poppins(
                 fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: valueColor ?? AppColors.darkText,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
                 color: Colors.grey[600],
               ),
             ),
-            Text(
-              user?.fullName ?? 'User',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primaryGreen,
-              ),
-            ),
-            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Stats Cards
-            Consumer5<MedicineProvider, SaleProvider, PrescriptionProvider, CreditProvider, ExpenseProvider>(
-              builder: (context, medicineProvider, saleProvider, prescriptionProvider, creditProvider, expenseProvider, child) {
-                final pendingPrescriptions = prescriptionProvider.prescriptions.where((p) => p.status == 'pending').length;
-                final overdueCredits = creditProvider.credits.where((c) => c.status == 'overdue').length;
-                final totalExpenses = expenseProvider.getTotalExpenses();
-                
-                return GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 1.2,
-                  children: [
-                    _buildStatCard(
-                      'Total Medicines',
-                      '${medicineProvider.medicines.length}',
-                      Icons.medical_services,
-                      Colors.blue,
+  Widget _buildSalesChartSection(DashboardProvider dashboardProvider) {
+    final chartData = dashboardProvider.salesChartData;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Sales Overview',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText,
                     ),
-                    _buildStatCard(
-                      'Low Stock',
-                      '${medicineProvider.lowStockMedicines.length}',
-                      Icons.warning,
-                      Colors.orange,
-                    ),
-                    _buildStatCard(
-                      'Today\'s Sales',
-                      'UGX ${saleProvider.dailyTotal.toStringAsFixed(0)}',
-                      Icons.today,
-                      Colors.green,
-                    ),
-                    _buildStatCard(
-                      'Pending Rx',
-                      '$pendingPrescriptions',
-                      Icons.medical_information,
-                      Colors.purple,
-                    ),
-                    _buildStatCard(
-                      'Overdue Credits',
-                      '$overdueCredits',
-                      Icons.warning_amber,
-                      Colors.red,
-                    ),
-                    _buildStatCard(
-                      'Total Expenses',
-                      'UGX ${totalExpenses.toStringAsFixed(0)}',
-                      Icons.money_off,
-                      Colors.deepOrange,
-                    ),
-                  ],
-                );
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // Sales Chart Section
-            Consumer<SaleProvider>(
-              builder: (context, saleProvider, child) {
-                final hourlyChartData = _prepareHourlyChartData(saleProvider.dailySales);
-
-                return Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sales Overview',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                  DropdownButton<String>(
+                    value: _selectedChartPeriod,
+                    items: _periodOptions.entries.map((entry) {
+                      return DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(entry.value),
+                      );
+                    }).toList(),
+                    onChanged: (value) async {
+                      if (value != null) {
+                        setState(() {
+                          _selectedChartPeriod = value;
+                        });
+                        await dashboardProvider.fetchSalesChart(period: value);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (chartData != null && chartData.sales.isNotEmpty)
+                SizedBox(
+                  height: 250,
+                  child: fl.LineChart(
+                    fl.LineChartData(
+                      gridData: fl.FlGridData(show: true),
+                      titlesData: fl.FlTitlesData(
+                        leftTitles: fl.AxisTitles(
+                          sideTitles: fl.SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                'UGX${(value/1000).toStringAsFixed(0)}k',
+                                style: const TextStyle(fontSize: 10),
+                              );
+                            },
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 200,
-                          child: SalesChart(
-                            salesData: hourlyChartData,
-                            chartType: 'daily',
+                        bottomTitles: fl.AxisTitles(
+                          sideTitles: fl.SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              final index = value.toInt();
+                              if (index >= 0 && index < chartData.labels.length) {
+                                return Text(
+                                  chartData.labels[index],
+                                  style: const TextStyle(fontSize: 10),
+                                );
+                              }
+                              return const Text('');
+                            },
+                          ),
+                        ),
+                        rightTitles: fl.AxisTitles(sideTitles: fl.SideTitles(showTitles: false)),
+                        topTitles: fl.AxisTitles(sideTitles: fl.SideTitles(showTitles: false)),
+                      ),
+                      borderData: fl.FlBorderData(show: false),
+                      lineBarsData: [
+                        fl.LineChartBarData(
+                          spots: chartData.sales.asMap().entries.map((e) => fl.FlSpot(e.key.toDouble(), e.value)).toList(),
+                          isCurved: true,
+                          color: AppColors.primaryGreen,
+                          barWidth: 3,
+                          dotData: fl.FlDotData(show: true),
+                          belowBarData: fl.BarAreaData(
+                            show: true,
+                            color: AppColors.primaryGreen.withOpacity(0.1),
                           ),
                         ),
                       ],
+                      lineTouchData: fl.LineTouchData(
+                        touchTooltipData: fl.LineTouchTooltipData(
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              return fl.LineTooltipItem(
+                                _formatCurrency(spot.y),
+                                const TextStyle(color: Colors.white),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
                     ),
                   ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 24),
-
-            // Quick Actions
-            Text(
-              'Quick Actions',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+                )
+              else
+                Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildChartLegend('Sales', AppColors.primaryGreen),
+                  if (chartData != null)
+                    Text(
+                      'Total: ${_formatCurrency(chartData.totalRevenue)}',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryGreen,
+                      ),
+                    ),
+                ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Actions',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.darkText,
             ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _buildQuickActionButton(
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickActionCard(
                   'New Sale',
                   Icons.add_shopping_cart,
                   Colors.green,
@@ -722,169 +611,68 @@ class DashboardHome extends StatelessWidget {
                     Navigator.pushNamed(context, '/new-sale');
                   },
                 ),
-                _buildQuickActionButton(
-                  'New Prescription',
-                  Icons.medical_information,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  'Add Product',
+                  Icons.add_box,
                   Colors.blue,
                   () {
-                    Navigator.pushNamed(context, '/create-prescription');
+                    Navigator.pushNamed(context, '/add-medicine');
                   },
                 ),
-                _buildQuickActionButton(
-                  'New Credit',
-                  Icons.credit_card,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  'Stock Check',
+                  Icons.inventory,
                   Colors.orange,
                   () {
-                    Navigator.pushNamed(context, '/create-credit');
+                    Navigator.pushNamed(context, '/medicines');
                   },
                 ),
-                _buildQuickActionButton(
-                  'Add Expense',
-                  Icons.money_off,
-                  Colors.red,
-                  () {
-                    Navigator.pushNamed(context, '/create-expense');
-                  },
-                ),
-                _buildQuickActionButton(
-                  'Stock Take',
-                  Icons.inventory,
-                  Colors.purple,
-                  () {
-                    Navigator.pushNamed(context, '/create-stock-take');
-                  },
-                ),
-                _buildQuickActionButton(
-                  'View Reports',
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildQuickActionCard(
+                  'Reports',
                   Icons.assessment,
-                  Colors.teal,
+                  Colors.purple,
                   () {
                     Navigator.pushNamed(context, '/reports');
                   },
                 ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Alerts Section
-            Consumer5<MedicineProvider, PrescriptionProvider, CreditProvider, StockProvider, ExpenseProvider>(
-              builder: (context, medicineProvider, prescriptionProvider, creditProvider, stockProvider, expenseProvider, child) {
-                final pendingPrescriptions = prescriptionProvider.prescriptions.where((p) => p.status == 'pending').length;
-                final overdueCredits = creditProvider.credits.where((c) => c.status == 'overdue').length;
-                final pendingStockTakes = stockProvider.stockTakes.where((s) => s.status == 'in_progress' || s.status == 'draft').length;
-                
-                if (medicineProvider.lowStockMedicines.isEmpty &&
-                    medicineProvider.expiringMedicines.isEmpty &&
-                    pendingPrescriptions == 0 &&
-                    overdueCredits == 0 &&
-                    pendingStockTakes == 0) {
-                  return const SizedBox.shrink();
-                }
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Alerts',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (medicineProvider.lowStockMedicines.isNotEmpty)
-                      _buildAlertCard(
-                        'Low Stock Alert',
-                        '${medicineProvider.lowStockMedicines.length} medicines need reordering',
-                        Icons.warning,
-                        Colors.orange,
-                        () {
-                          Navigator.pushNamed(context, '/medicines');
-                        },
-                      ),
-                    if (medicineProvider.expiringMedicines.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      _buildAlertCard(
-                        'Expiring Soon',
-                        '${medicineProvider.expiringMedicines.length} medicines will expire within 30 days',
-                        Icons.event,
-                        Colors.red,
-                        () {
-                          Navigator.pushNamed(context, '/medicines');
-                        },
-                      ),
-                    ],
-                    if (pendingPrescriptions > 0) ...[
-                      const SizedBox(height: 8),
-                      _buildAlertCard(
-                        'Pending Prescriptions',
-                        '$pendingPrescriptions prescriptions waiting to be dispensed',
-                        Icons.medical_information,
-                        Colors.blue,
-                        () {
-                          Navigator.pushNamed(context, '/prescriptions');
-                        },
-                      ),
-                    ],
-                    if (overdueCredits > 0) ...[
-                      const SizedBox(height: 8),
-                      _buildAlertCard(
-                        'Overdue Credits',
-                        '$overdueCredits credits past due date',
-                        Icons.warning_amber,
-                        Colors.red,
-                        () {
-                          Navigator.pushNamed(context, '/credits');
-                        },
-                      ),
-                    ],
-                    if (pendingStockTakes > 0) ...[
-                      const SizedBox(height: 8),
-                      _buildAlertCard(
-                        'Pending Stock Takes',
-                        '$pendingStockTakes stock takes in progress',
-                        Icons.inventory,
-                        Colors.orange,
-                        () {
-                          Navigator.pushNamed(context, '/stock-takes');
-                        },
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+  Widget _buildQuickActionCard(String title, IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Icon(icon, color: color, size: 32),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 8),
             Text(
               title,
               style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.grey[600],
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: color,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -892,26 +680,310 @@ class DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActionButton(String label, IconData icon, Color color, VoidCallback onTap) {
-    return Material(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+  Widget _buildPendingPrescriptionsSection(PrescriptionProvider provider) {
+    final pendingPrescriptions = provider.prescriptions
+        .where((p) => p.status == 'pending')
+        .take(3)
+        .toList();
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 8),
               Text(
-                label,
+                'Pending Prescriptions',
                 style: GoogleFonts.poppins(
-                  color: color,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkText,
                 ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/prescriptions');
+                },
+                child: Text(
+                  '${provider.prescriptions.where((p) => p.status == 'pending').length} Pending',
+                  style: GoogleFonts.poppins(
+                    color: AppColors.primaryGreen,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (pendingPrescriptions.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: Text(
+                  'No pending prescriptions',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ),
+            )
+          else
+            ...pendingPrescriptions.map((prescription) => 
+              _buildPrescriptionCard(prescription, context),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrescriptionCard(Prescription prescription, BuildContext context) {
+    final isUrgent = prescription.notes.toLowerCase().contains('urgent');
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 50,
+            decoration: BoxDecoration(
+              color: isUrgent ? Colors.red : AppColors.primaryGreen,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${prescription.prescriptionNumber} - ${prescription.items.first.productName}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Patient: ${prescription.patientName} • Dr. ${prescription.doctorName}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: isUrgent ? Colors.red.shade50 : AppColors.veryLightGreen,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              isUrgent ? 'Critical' : 'Standard',
+              style: GoogleFonts.poppins(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: isUrgent ? Colors.red : AppColors.primaryGreen,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInventoryAlertsSection(MedicineProvider provider) {
+    final expiringMedicines = provider.expiringMedicines.take(4).toList();
+    final lowStockMedicines = provider.lowStockMedicines.take(4).toList();
+    
+    if (expiringMedicines.isEmpty && lowStockMedicines.isEmpty) {
+      return const SizedBox();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Inventory Alerts',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.darkText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (lowStockMedicines.isNotEmpty)
+            Column(
+              children: [
+                _buildAlertCard(
+                  title: 'Low Stock Alert',
+                  count: provider.lowStockMedicines.length,
+                  items: lowStockMedicines,
+                  icon: Icons.warning,
+                  color: Colors.orange,
+                  route: '/medicines',
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          if (expiringMedicines.isNotEmpty)
+            _buildAlertCard(
+              title: 'Expiring Soon',
+              count: provider.expiringMedicines.length,
+              items: expiringMedicines,
+              icon: Icons.hourglass_empty,
+              color: Colors.red,
+              route: '/medicines',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlertCard({
+    required String title,
+    required int count,
+    required List items,
+    required IconData icon,
+    required Color color,
+    required String route,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '$title: $count items need attention',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, route);
+                },
+                child: Text(
+                  'View All',
+                  style: GoogleFonts.poppins(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (items.isNotEmpty)
+            const SizedBox(height: 8),
+          if (items.isNotEmpty)
+            ...items.take(2).map((item) => Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Text(
+                    '• ${item.name}',
+                    style: GoogleFonts.poppins(fontSize: 12),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Stock: ${item.quantity}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentStatusSection(CreditProvider creditProvider) {
+    final credits = creditProvider.credits;
+    final totalPending = credits.where((c) => c.status == 'pending').fold<double>(0, (sum, c) => sum + c.amount);
+    final totalOverdue = credits.where((c) => c.status == 'overdue').fold<double>(0, (sum, c) => sum + c.amount);
+    
+    if (totalPending == 0 && totalOverdue == 0) {
+      return const SizedBox();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Payment Status',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkText,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildPaymentStatusCard(
+                      'Pending Payments',
+                      _formatCurrency(totalPending),
+                      Icons.pending,
+                      Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildPaymentStatusCard(
+                      'Overdue Payments',
+                      _formatCurrency(totalOverdue),
+                      Icons.warning,
+                      Colors.red,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -920,23 +992,82 @@ class DashboardHome extends StatelessWidget {
     );
   }
 
-  Widget _buildAlertCard(String title, String subtitle, IconData icon, Color color, VoidCallback onTap) {
-    return Card(
-      color: color.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(
-          title,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w600,
+  Widget _buildPaymentStatusCard(String title, String amount, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            amount,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: color,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChartLegend(String title, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
             color: color,
+            shape: BoxShape.circle,
           ),
         ),
-        subtitle: Text(subtitle),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: color),
-        onTap: onTap,
-      ),
+        const SizedBox(width: 6),
+        Text(
+          title,
+          style: GoogleFonts.poppins(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  String _getTimeOfDay() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
+  }
+
+  String _formatCurrency(double amount) {
+    return NumberFormat.currency(
+      symbol: 'UGX ',
+      decimalDigits: 0,
+    ).format(amount);
+  }
+}
+
+// Placeholder for MedicineListScreen
+class MedicineListScreen extends StatelessWidget {
+  const MedicineListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: Text('Medicines Screen')),
     );
   }
 }

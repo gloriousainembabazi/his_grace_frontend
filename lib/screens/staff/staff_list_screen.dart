@@ -2,19 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../providers/auth_provider.dart';
-import '../../widgets/loading_indicator.dart';
-import '../../widgets/custom_button.dart';
+import '../../models/user.dart';
 import '../../utils/constants.dart';
+import '../../widgets/custom_button.dart';
+
+// Extension to get user initials
+extension UserExtension on User {
+  String get initials {
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    } else if (firstName.isNotEmpty) {
+      return firstName[0].toUpperCase();
+    } else if (username.isNotEmpty) {
+      return username[0].toUpperCase();
+    }
+    return 'U';
+  }
+}
 
 class StaffListScreen extends StatefulWidget {
   const StaffListScreen({super.key});
 
   @override
-  _StaffListScreenState createState() => _StaffListScreenState();
+  State<StaffListScreen> createState() => _StaffListScreenState();
 }
 
 class _StaffListScreenState extends State<StaffListScreen> {
-  List<dynamic> _staff = [];
+  List<User> _staff = [];
   bool _isLoading = true;
   String? _error;
 
@@ -31,13 +45,11 @@ class _StaffListScreenState extends State<StaffListScreen> {
     });
 
     try {
-      // You'll need to implement getUsers in your AuthProvider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      // This is a placeholder - implement actual API call
-      await Future.delayed(const Duration(seconds: 1));
+      final users = await authProvider.getUsers();
       
       setState(() {
-        _staff = []; // Replace with actual staff data
+        _staff = users;
         _isLoading = false;
       });
     } catch (e) {
@@ -51,14 +63,15 @@ class _StaffListScreenState extends State<StaffListScreen> {
   void _showAddStaffDialog() {
     showDialog(
       context: context,
-      builder: (context) => const AddStaffDialog(),
+      builder: (context) => AddStaffDialog(onStaffAdded: _loadStaff),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final isAdmin = authProvider.currentUser?.isAdmin ?? false;
+    final user = authProvider.currentUser;
+    final isAdmin = user?.isAdmin ?? false;
 
     if (!isAdmin) {
       return Scaffold(
@@ -100,7 +113,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
         ],
       ),
       body: _isLoading
-          ? const LoadingIndicator()
+          ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
                   child: Column(
@@ -185,7 +198,11 @@ class _StaffListScreenState extends State<StaffListScreen> {
     );
   }
 
-  Widget _buildStaffCard(dynamic staff) {
+  Widget _buildStaffCard(User staff) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+    final isCurrentUser = currentUser?.id == staff.id;
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -194,7 +211,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
         leading: CircleAvatar(
           backgroundColor: AppColors.veryLightGreen,
           child: Text(
-            staff['name']?[0] ?? 'S',
+            staff.initials,
             style: GoogleFonts.poppins(
               color: AppColors.primaryGreen,
               fontWeight: FontWeight.bold,
@@ -202,20 +219,21 @@ class _StaffListScreenState extends State<StaffListScreen> {
           ),
         ),
         title: Text(
-          staff['name'] ?? 'Staff Member',
+          staff.fullName.isNotEmpty ? staff.fullName : staff.username,
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              staff['email'] ?? 'No email',
+              staff.email,
               style: GoogleFonts.poppins(fontSize: 12),
             ),
-            Text(
-              staff['phone'] ?? 'No phone',
-              style: GoogleFonts.poppins(fontSize: 12),
-            ),
+            if (staff.phone.isNotEmpty)
+              Text(
+                staff.phone,
+                style: GoogleFonts.poppins(fontSize: 12),
+              ),
           ],
         ),
         trailing: Row(
@@ -224,79 +242,109 @@ class _StaffListScreenState extends State<StaffListScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: staff['role'] == 'admin'
+                color: staff.isAdmin
                     ? Colors.purple.withOpacity(0.1)
                     : Colors.blue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                staff['role'] ?? 'staff',
+                staff.role.toUpperCase(),
                 style: GoogleFonts.poppins(
                   fontSize: 10,
-                  color: staff['role'] == 'admin' ? Colors.purple : Colors.blue,
+                  color: staff.isAdmin ? Colors.purple : Colors.blue,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  // Edit staff
-                } else if (value == 'delete') {
-                  _showDeleteDialog(staff);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
+            if (!isCurrentUser) ...[
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _showEditStaffDialog(staff);
+                  } else if (value == 'delete') {
+                    _showDeleteDialog(staff);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  void _showDeleteDialog(dynamic staff) {
+  void _showEditStaffDialog(User staff) {
+    // TODO: Implement edit dialog
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Edit feature coming soon')),
+    );
+  }
+
+  void _showDeleteDialog(User staff) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Staff'),
-        content: Text('Are you sure you want to delete ${staff['name']}?'),
+        content: Text('Are you sure you want to delete ${staff.fullName}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              // Delete staff
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Staff deleted successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              try {
+                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                final success = await authProvider.deleteUser(staff.id);
+                
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Staff deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _loadStaff();
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to delete staff'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e')),
+                  );
+                }
+              }
             },
             style: TextButton.styleFrom(
               foregroundColor: Colors.red,
@@ -310,19 +358,23 @@ class _StaffListScreenState extends State<StaffListScreen> {
 }
 
 class AddStaffDialog extends StatefulWidget {
-  const AddStaffDialog({super.key});
+  final VoidCallback onStaffAdded;
+
+  const AddStaffDialog({super.key, required this.onStaffAdded});
 
   @override
-  _AddStaffDialogState createState() => _AddStaffDialogState();
+  State<AddStaffDialog> createState() => _AddStaffDialogState();
 }
 
 class _AddStaffDialogState extends State<AddStaffDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   String _selectedRole = 'staff';
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -349,15 +401,31 @@ class _AddStaffDialogState extends State<AddStaffDialog> {
               const SizedBox(height: 24),
 
               TextFormField(
-                controller: _nameController,
+                controller: _firstNameController,
                 decoration: const InputDecoration(
-                  labelText: 'Full Name',
+                  labelText: 'First Name',
                   prefixIcon: Icon(Icons.person_outline),
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter name';
+                    return 'Please enter first name';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _lastNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Last Name',
+                  prefixIcon: Icon(Icons.person_outline),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter last name';
                   }
                   return null;
                 },
@@ -392,12 +460,6 @@ class _AddStaffDialogState extends State<AddStaffDialog> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter phone number';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
 
@@ -430,6 +492,9 @@ class _AddStaffDialogState extends State<AddStaffDialog> {
                 ),
                 items: const [
                   DropdownMenuItem(value: 'staff', child: Text('Staff')),
+                  DropdownMenuItem(value: 'pharmacist', child: Text('Pharmacist')),
+                  DropdownMenuItem(value: 'cashier', child: Text('Cashier')),
+                  DropdownMenuItem(value: 'manager', child: Text('Manager')),
                   DropdownMenuItem(value: 'admin', child: Text('Admin')),
                 ],
                 onChanged: (value) {
@@ -441,42 +506,35 @@ class _AddStaffDialogState extends State<AddStaffDialog> {
 
               const SizedBox(height: 24),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('CANCEL'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          // Add staff logic here
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () {
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Staff added successfully'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('CANCEL'),
                       ),
-                      child: const Text('ADD'),
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _saveStaff,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGreen,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('ADD'),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -484,9 +542,57 @@ class _AddStaffDialogState extends State<AddStaffDialog> {
     );
   }
 
+  Future<void> _saveStaff() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final userData = {
+      'username': _emailController.text.split('@')[0],
+      'email': _emailController.text,
+      'password': _passwordController.text,
+      'first_name': _firstNameController.text,
+      'last_name': _lastNameController.text,
+      'role': _selectedRole,
+      'phone': _phoneController.text,
+    };
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.createUser(userData);
+      
+      if (success && mounted) {
+        widget.onStaffAdded();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Staff added successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add staff'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();

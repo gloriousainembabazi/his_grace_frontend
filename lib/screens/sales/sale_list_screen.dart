@@ -1,12 +1,13 @@
+// lib/screens/sales/sale_list_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../models/sale.dart';                // ADD THIS
+import '../../models/sale.dart';
 import '../../providers/sale_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../utils/constants.dart';
-
 
 class SaleListScreen extends StatefulWidget {
   const SaleListScreen({super.key});
@@ -31,7 +32,6 @@ class _SaleListScreenState extends State<SaleListScreen> {
   Future<void> _loadSales() async {
     final provider = Provider.of<SaleProvider>(context, listen: false);
     await provider.loadSales(refresh: true);
-    await provider.loadDailySales();
   }
 
   void _onScroll() {
@@ -69,7 +69,8 @@ class _SaleListScreenState extends State<SaleListScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final isAdmin = authProvider.currentUser?.isAdmin ?? false;
+    final user = authProvider.currentUser;
+    final isAdmin = user?.isAdmin ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -171,7 +172,9 @@ class _SaleListScreenState extends State<SaleListScreen> {
                     leading: CircleAvatar(
                       backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
                       child: Text(
-                        sale.saleId.substring(sale.saleId.length - 4),
+                        sale.saleId.length >= 4 
+                            ? sale.saleId.substring(sale.saleId.length - 4)
+                            : sale.saleId,
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -191,7 +194,7 @@ class _SaleListScreenState extends State<SaleListScreen> {
                           style: GoogleFonts.poppins(fontSize: 12),
                         ),
                         Text(
-                          '${sale.saleDate.day}/${sale.saleDate.month}/${sale.saleDate.year} ${sale.saleDate.hour}:${sale.saleDate.minute}',
+                          sale.formattedDate,
                           style: GoogleFonts.poppins(
                             fontSize: 10,
                             color: Colors.grey.shade600,
@@ -234,7 +237,7 @@ class _SaleListScreenState extends State<SaleListScreen> {
           );
         },
       ),
-      floatingActionButton: !(Provider.of<AuthProvider>(context).currentUser?.isAdmin ?? false)
+      floatingActionButton: !isAdmin
           ? FloatingActionButton(
               onPressed: () {
                 Navigator.pushNamed(context, '/new-sale').then((_) {
